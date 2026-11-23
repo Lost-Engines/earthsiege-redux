@@ -24,7 +24,7 @@ public:
   void restore(std::span<uint8_t const> source);
   void reset_detail() { detail.reset(); }
   void store(framebuffer const &frame, int x, int y);
-  void sample(framebuffer &frame, int x, int y) const;
+  void sample(framebuffer &frame, int x, int y, screen_mask const *window = nullptr) const;
   std::span<uint8_t const> pixels() const {
     return pixels_;
   }

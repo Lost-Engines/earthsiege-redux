@@ -390,6 +390,9 @@ void mission_view::present_view() {
       surface.sample(image, page * 160 + position.x, position.y);
       pan_frames.push_back(std::move(image));
     }
+    // At the end of a horizontal scroll 22904 copies the incoming view
+    // across to the second page before normal page flipping resumes.
+    if(state.pending >= 4) surface.copy_page(state.other_page * 160, state.draw_page * 160, {0, 0, 319, 199});
   }
   if(state.prepared && state.pending == 3) {
     surface.restore_from_external(state.other_page * 160, state.draw_page * 160);
@@ -840,6 +843,9 @@ void mission_view::draw() {
   bool const inside{camera.mode == camera_mode::attached};
   auto const &window{cockpit.windows[static_cast<size_t>(painted)]};
   auto const shift{inside ? (startup ? startup->displacement() : impact.snapshot().displacement) : 0};
+  auto const presentation{transitions.snapshot()};
+  int const page_x{presentation.other_page * 160};
+  int const page_y{inside ? window.instrument_origin[1] : 0};
   auto mask{window.mask};
   if(shift) mask.translate(0, -shift);
   auto &colours{impact.snapshot().impact_palette ? impact_colours : display_colours};
@@ -854,9 +860,7 @@ void mission_view::draw() {
   }
   if(inside) {
     cockpit.draw_composed(frame, painted, shift);
-    auto const presentation{transitions.snapshot()};
-    int const page{presentation.other_page};
-    surface.restore_artwork_edge(frame, page * 160, window.instrument_origin[1] + shift);
+    surface.restore_artwork_edge(frame, page_x, page_y + shift);
     auto const centre{window.projection_centre()};
     view.projection.centre = {centre[0], centre[1]};
     view.bounds = window.bounds;
@@ -875,7 +879,10 @@ void mission_view::draw() {
   // still draws it, but idle lower-panel frames do not advance cloud wind.
   if(session->recording_paused() && !options_camera) {
     frame.restore_world(world_frame, mask);
-  } else if(transitions.snapshot().view != 1 || transitions.snapshot().prepared) {
+  } else if(presentation.view != 1 || presentation.prepared) {
+    // The rolled sky and ground can leave pixels untouched. DOS keeps
+    // whatever was last drawn at those coordinates on this VGA page.
+    if(!options_camera) surface.sample(frame, page_x, page_y, &mask);
     world_target = frame.resampled(scene_size);
     // The detailed image is composited through the authored window after
     // rasterization. The reference rasterizer applies its spans per primitive.
@@ -965,12 +972,9 @@ void mission_view::draw() {
     navigation.draw(frame, -origin[0], -origin[1], session->player_weapon_controls().auto_tracking());
   }
   if(!options_camera) {
-    auto const state{transitions.snapshot()};
     // The original +88/+8c pair is swapped after scanout; the actual
     // driver draw selector (+3c) then targets the other page.
-    int const page{state.other_page};
-    int const y{inside ? cockpit.windows[static_cast<size_t>(painted)].instrument_origin[1] : 0};
-    surface.store(frame, page * 160, y);
+    surface.store(frame, page_x, page_y);
   }
   auto const next_weapon_rows{session->player_weapon_controls().displays()};
   painted_weapon_rows.assign(next_weapon_rows.begin(), next_weapon_rows.end());

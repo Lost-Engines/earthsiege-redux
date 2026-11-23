@@ -59,6 +59,15 @@ int main(int argc, char **argv) try {
   if(composed.pixels()[0] != 12 || composed.pixels()[2] != 0) f.fail("world detail and HUD coverage");
   cockpit_surface pages;
   pages.store(page, 320, 0);
+  earthsiege::screen_mask window;
+  window.rows[0].push_back({0, 0});
+  framebuffer cockpit;
+  cockpit.clear(28);
+  pages.sample(cockpit, 320, 0, &window);
+  auto restored{cockpit.resampled(size)};
+  if(restored.pixels()[0] != 12 || restored.pixels()[1] != 0 || restored.pixels()[2] != 28) {
+    f.fail("restoring the draw page must retain individual world pixels inside the cockpit window");
+  }
   framebuffer pan;
   pages.sample(pan, 160, 0);
   pages.copy_page(0, 320, {0, 0, 319, 199});

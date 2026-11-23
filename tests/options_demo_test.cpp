@@ -13,6 +13,16 @@ namespace {
 void require(bool ok, char const *why) {
   if(!ok) throw std::runtime_error{why};
 }
+uint32_t rgb_crc(framebuffer const &frame, earthsiege::palette const &palette, earthsiege::rectangle crop) {
+  std::vector<uint8_t> rgb;
+  for(int y{crop.top}; y <= crop.bottom; ++y) {
+    for(int x{crop.left}; x <= crop.right; ++x) {
+      auto colour{palette.colours[frame.pixels()[static_cast<size_t>(y) * frame.size().width + x]]};
+      for(unsigned shift : {16U, 8U, 0U}) rgb.push_back(static_cast<uint8_t>(colour >> shift));
+    }
+  }
+  return earthsiege::crc32(rgb);
+}
 struct recording_span {
   size_t first_poll, last_poll;
   unsigned earliest_ticks;
@@ -94,7 +104,9 @@ int main(int argc, char **argv) try {
     bool checked_panel{false};
     unsigned timed_pans{0};
     bool const retail_patrol{resources.edition() == earthsiege::game_edition::original && demo == 3};
+    bool const retail_turn{resources.edition() == earthsiege::game_edition::original && demo == 2};
     unsigned const interrupt_frame{retail_patrol ? 481U : 3U};
+    size_t const minimum_presentations{retail_turn ? 189U : apocalypse_panel ? 90U : 0U};
     std::vector<recording_span> spans;
     if(retail_patrol) {
       // The last span is in the exit dialog. Its mouse moves from tick 9294
@@ -161,20 +173,20 @@ int main(int argc, char **argv) try {
         }
         require(frame.pixels().size() == 320 * 200, "demo presents game frames");
         ++shown;
+        if(retail_turn) {
+          // DOSBox crops across the first bank, its reversal and the first side-view pan.
+          for(auto [number, expected] : {std::pair{155U, 0x1ee2e843U}, {167U, 0x64287ecfU},
+                                         {182U, 0x113292f2U}, {189U, 0x2f80c578U}}) {
+            if(shown == number) require(rgb_crc(frame, playback.view().colours(), {70, 69, 249, 91}) == expected,
+                                        "banked terrain and panorama differ from DOS");
+          }
+        }
         if(apocalypse_panel && shown == 90) {
           // Native-resolution RGB crop of the DOSBox lower panel, including the F7/F8 buttons and crew.
-          std::vector<uint8_t> rgb;
-          auto const &palette{playback.view().colours().colours};
-          for(int y{124}; y < 193; ++y) {
-            for(int x{29}; x < 294; ++x) {
-              auto colour{palette[frame.pixels()[static_cast<size_t>(y * earthsiege::screen_width + x)]]};
-              for(unsigned shift : {16U, 8U, 0U}) rgb.push_back(static_cast<uint8_t>(colour >> shift));
-            }
-          }
-          require(earthsiege::crc32(rgb) == 0x4f79198a, "Apocalypse crew and lower panel differ from DOS");
+          require(rgb_crc(frame, playback.view().colours(), {29, 124, 293, 192}) == 0x4f79198a, "Apocalypse crew and lower panel differ from DOS");
           checked_panel = true;
         }
-        return full || playback.frames_played() < interrupt_frame || (apocalypse_panel && !checked_panel);
+        return full || playback.frames_played() < interrupt_frame || shown < minimum_presentations;
       });
       require(shown < 20000, "playback terminates");
     }
@@ -202,7 +214,7 @@ int main(int argc, char **argv) try {
         require(checked_music_cursor && timed_pans == 4, "retail patrol music menu and four cockpit pans");
       }
     } else {
-      require((apocalypse_panel || playback.frames_played() == interrupt_frame) && playback.packets_read() < playback.packet_count(), "host input can interrupt playback");
+      require((shown == minimum_presentations || playback.frames_played() == interrupt_frame) && playback.packets_read() < playback.packet_count(), "host input can interrupt playback");
     }
   }
   require(save_store{temp.path, resources.edition()}.index().entries.empty(), "playback creates no career");

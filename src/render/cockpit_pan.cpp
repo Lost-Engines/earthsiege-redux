@@ -75,16 +75,25 @@ void cockpit_surface::store(framebuffer const &frame, int x, int y) {
     }
   }
 }
-void cockpit_surface::sample(framebuffer &frame, int x, int y) const {
+void cockpit_surface::sample(framebuffer &frame, int x, int y, screen_mask const *window) const {
   if(x < 0 || y < 0 || x + 320 > 640 || y + 200 > 400) throw std::out_of_range{"cockpit scanout outside surface"};
   scoped_framebuffer_clip clip{frame, nullptr};
-  frame.clear();
+  if(!window) frame.clear();
+  if(detail) {
+    frame.attach(detail, page_size.from_logical({x, y, x + 319, y + 199}), window);
+    return;
+  }
   for(int row{0}; row < 200; ++row) {
-    for(int column{0}; column < 320; ++column) {
-      frame.pixel(column, row, pixels_[static_cast<size_t>((y + row) * 640 + x + column)]);
+    auto const *source{pixels_.data() + (y + row) * 640 + x};
+    if(window) {
+      for(auto span : window->rows[row]) {
+        auto dest{frame.opaque_span(row, span.left, span.right)};
+        std::copy_n(source + span.left, dest.size(), dest.begin());
+      }
+    } else {
+      std::copy_n(source, 320, frame.opaque_span(row, 0, 319).begin());
     }
   }
-  if(detail) frame.attach(detail, page_size.from_logical({x, y, x + 319, y + 199}));
 }
 
 void cockpit_surface::copy_page(int source_x, int target_x, rectangle bounds) {

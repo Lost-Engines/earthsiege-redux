@@ -22,6 +22,14 @@ colour. A fully covered scene needs no world texture upload. The shader and
 the screenshot renderer use the same nearest-neighbour cell boundaries. Mouse
 input and cursor warps use the same fitted rectangle, including on HiDPI displays.
 
+The sky bands and ground texture round their edges separately when the HERC
+banks. Some pixels at the foot of the panorama sit between those edges. DOS
+alternates between two VGA pages, so these pixels keep the terrain or scenery
+last drawn on that page. Redux keeps both pages at the selected resolution.
+At the end of a horizontal cockpit pan the game copies the incoming view to
+the other page before it resumes flipping between them. The first turn in
+retail demo 2 shows both behaviours.
+
 The launch lift has shorter frame intervals than ordinary driving. The first
 115 frames of retail demo 2 take 3.296 seconds on its recorded clock. To replay
 the lift and its final shake at 4K, run
