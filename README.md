@@ -13,7 +13,7 @@ Earthsiege Redux builds on the native C++26 reconstruction of **Metaltech: Earth
 
 The March 1995 CD expansion is included alongside the original game. The launcher offers a choice of editions; `--original` and `--expansion` start either directly. Both battlesets, career transfer, Apocalypse, the new enemies and weapons, deployment pods, environments, music and CD cinematics are connected. All four expansion demos now match the original player motion and gameplay RNG throughout; the [replay audit](docs/DEMO_REPLAY.md) covers 11,071 simulation updates. [Expansion integration](docs/EXPANSION.md) describes the original-code comparisons and the limits of that coverage. The 1996 base-game reissue has unchanged 1.0 game files.
 
-The local suite passed 307 tests, including the Linux window check and four complete original recordings whose gameplay states and return files match. The [validation report](docs/VALIDATION.md) describes the original-executable comparisons and remaining presentation and audio timing differences.
+The local suite passed 309 tests, including the Linux window check and four complete original recordings whose gameplay states and return files match. The [validation report](docs/VALIDATION.md) describes the original-executable comparisons and remaining presentation and audio timing differences.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -43,6 +43,8 @@ During the first turn in demo 2, the DOS sky and ground can leave a strip of a p
 `--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. At `2.0` each switch happens twice as far from the model. The Shapes setting determines the finest detail available.
 
 `--distance-cutoff-multiplier N` scales how far you can see buildings, HERCs and terrain models. At `2.0` each remains visible to twice its usual range. Both options default to `1.0` and accept positive fractions such as `0.5`. Fog follows the mission's original distances. Objects visible beyond those distances keep their farthest tint.
+
+In DOS, a distant building could lose its silhouette in the haze while its painted panels still stood out. Redux fades model textures through the same distance bands as the solid faces. Up close you see the original texture lighting. Farther out, the markings pick up the fog colour for their material and time of day.
 
 ```sh
 ./build/earthsiege --demo 2 --lod-distance-multiplier 2.0 --distance-cutoff-multiplier 2.0

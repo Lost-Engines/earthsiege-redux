@@ -37,7 +37,10 @@ class model_renderer {
 
 public:
   model_renderer(framebuffer &target, palette const &colours);
-  void draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> textures, std::span<light const> lights, std::span<model_attachment const> attachments = {});
+  texture_shade_maps const &texture_lighting() const {
+    return texture_shades;
+  }
+  void draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> textures, std::span<light const> lights, std::span<model_attachment const> attachments = {}, texture_shade_maps const *fogged_textures = nullptr);
 };
 
 } // namespace earthsiege

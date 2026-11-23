@@ -39,6 +39,63 @@ void append_range(std::vector<uint16_t> &target, int const first, int const coun
   for(int index{0}; index < count; ++index) target.push_back(static_cast<uint16_t>(first + index));
 }
 
+using dac_colour = std::array<uint8_t, 3>;
+using colour_map = std::array<uint8_t, 256>;
+
+int colour_error(dac_colour const &a, dac_colour const &b) {
+  int const red{a[0] - b[0]};
+  int const green{a[1] - b[1]};
+  int const blue{a[2] - b[2]};
+  return red * red + green * green + blue * blue;
+}
+
+uint8_t nearest_in_range(palette const &colours, uint8_t const ink, palette_range const range) {
+  if(ink >= range.first && ink < range.first + range.count) return ink;
+  int best{range.first};
+  for(int i{best + 1}; i < range.first + range.count; ++i) {
+    if(colour_error(colours.dac_colours[i], colours.dac_colours[ink]) < colour_error(colours.dac_colours[best], colours.dac_colours[ink])) best = i;
+  }
+  return static_cast<uint8_t>(best);
+}
+
+// Map a lit pixel through one material's distance ramps. For colours outside
+// its near ramp, carry their RGB difference from the closest swatch, fading
+// that difference to zero over the same distance. Quantise to world colours
+// so a distant marking cannot pick up an animated cockpit palette entry.
+std::vector<colour_map> texture_fog_column(palette const &colours, std::vector<palette_range> const &ranges, std::span<uint8_t const> world_inks) {
+  auto const near{ranges.front()};
+  int const last{static_cast<int>(ranges.size()) - 1};
+  int const span{std::max(1, near.count - 1)};
+  std::vector<colour_map> result(last);
+  for(int ink{0}; ink < 256; ++ink) {
+    auto const anchor{nearest_in_range(colours, static_cast<uint8_t>(ink), near)};
+    auto const &lit{colours.dac_colours[ink]};
+    auto const &reference{colours.dac_colours[anchor]};
+    for(int level{1}; level <= last; ++level) {
+      auto const range{ranges[level]};
+      uint8_t const shade{static_cast<uint8_t>(range.first + ((anchor - near.first) * (range.count - 1) + span / 2) / span)};
+      auto &entry{result[level - 1][ink]};
+      entry = shade;
+      if(lit == reference || level == last) continue;
+      dac_colour wanted;
+      for(size_t channel{0}; channel < wanted.size(); ++channel) {
+        int const residual{(lit[channel] - reference[channel]) * (last - level) / last};
+        wanted[channel] = static_cast<uint8_t>(std::clamp(colours.dac_colours[shade][channel] + residual, 0, 63));
+      }
+      entry = static_cast<uint8_t>(ink);
+      auto error{colour_error(lit, wanted)};
+      for(auto const candidate : world_inks) {
+        auto const next{colour_error(colours.dac_colours[candidate], wanted)};
+        if(next < error) {
+          error = next;
+          entry = candidate;
+        }
+      }
+    }
+  }
+  return result;
+}
+
 } // anonymous namespace
 
 distance_shade_bindings read_distance_shade_bindings(bytes const source) {
@@ -81,6 +138,45 @@ distance_shading::distance_shading(world_environment const &source, distance_sha
   highlights = interpolate_ranges(source.blend_ranges[0], source.blend_ranges[1], source.shade_levels);
 }
 
+void distance_shading::prepare_texture_shades(palette const &colours, texture_shade_maps const &lighting) {
+  std::array<bool, 256> used{};
+  for(auto const &column : bands) {
+    for(auto const range : column) {
+      if(range.count <= 0 || range.first < 0 || range.first + range.count > 256) throw std::out_of_range{"invalid texture fog ramp"};
+      for(int i{range.first}; i < range.first + range.count; ++i) used[i] = true;
+    }
+  }
+  std::vector<uint8_t> world_inks;
+  for(size_t i{0}; i < used.size(); ++i) {
+    if(used[i]) world_inks.push_back(static_cast<uint8_t>(i));
+  }
+  std::vector<std::vector<colour_map>> columns;
+  for(auto const &ranges : bands) columns.push_back(texture_fog_column(colours, ranges, world_inks));
+
+  texture_bands.assign(bindings.size(), {});
+  for(size_t kind{0}; kind < bindings.size(); ++kind) {
+    auto const &mapping{bindings[kind]};
+    if(mapping.empty()) continue;
+    auto &tables{texture_bands[kind]};
+    tables.resize(environment.shade_levels - 1);
+    for(int ink{0}; ink < 256; ++ink) {
+      // Texture faces name a bitmap instead of a material. Prefer the ramp
+      // containing the original index, even when another ramp shares its RGB.
+      // A change of face lighting must not switch the material's fog colour.
+      auto const match_error{[&](shade_binding binding) {
+        auto const near{bands.at(binding.environment_column).front()};
+        auto const anchor{nearest_in_range(colours, static_cast<uint8_t>(ink), near)};
+        return anchor == ink ? -1 : colour_error(colours.dac_colours[anchor], colours.dac_colours[ink]);
+      }};
+      auto const material{std::ranges::min_element(mapping, {}, match_error)->environment_column};
+      for(size_t band{0}; band < tables.size(); ++band) {
+        auto const &fog{columns[material][band]};
+        for(size_t light{0}; light < lighting.size(); ++light) tables[band][light][ink] = fog[lighting[light][ink]];
+      }
+    }
+  }
+}
+
 size_t distance_shading::band(int32_t distance, int16_t const native_class, int16_t const radius) const {
   if(native_class == ground_target_class) distance = std::max(0, wrap_long(static_cast<int64_t>(distance) + environment.model_distance_offsets[radius >= large_model_radius ? 1 : 0]));
   auto const &distances{environment.distance_bands[native_class == terrain_class ? 1 : 0]};
@@ -96,9 +192,9 @@ bool distance_shading::culled(int32_t distance, int16_t const native_class, int1
   return static_cast<uint32_t>(distance) > (native_class == terrain_class ? terrain_cutoff : actor_cutoff);
 }
 
-void distance_shading::apply(palette &target, int32_t const distance, int16_t const native_class, int16_t const radius, bool const split_highlights) const {
+texture_shade_maps const *distance_shading::apply(palette &target, int32_t const distance, int16_t const native_class, int16_t const radius, bool const split_highlights) const {
   auto const &mapping{bindings.at(static_cast<size_t>(native_class))};
-  if(mapping.empty()) return;
+  if(mapping.empty()) return nullptr;
   auto const level{band(std::max(0, distance), native_class, radius)};
   for(auto const &binding : mapping) {
     auto const range{bands.at(binding.environment_column).at(level)};
@@ -113,6 +209,7 @@ void distance_shading::apply(palette &target, int32_t const distance, int16_t co
       append_range(ramp, range.first, range.count);
     }
   }
+  return level && !texture_bands.empty() ? &texture_bands.at(native_class).at(level - 1) : nullptr;
 }
 
 } // namespace earthsiege
