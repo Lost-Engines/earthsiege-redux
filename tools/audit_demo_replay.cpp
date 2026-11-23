@@ -72,7 +72,8 @@ int main(int argc, char **argv) try {
   auto prefs{extended ? file.take(17) : bytes{}};
   auto expected_packets{terminal ? file.integer<uint32_t>() : uint32_t{0}};
   auto tape{read_input_tape(read_file(resources.root() / "TAPES" / ("DEMO" + std::to_string(demo) + ".TAP")))};
-  mission_view view{resources, tape};
+  // The reference frames were recorded with the DOS model detail and draw distances.
+  mission_view view{resources, tape, {}, {.lod{1.0}, .cutoff{1.0}}};
   std::ofstream audio_log;
   int64_t audio_frame{-1};
   std::vector<replay_sound_request> audio_requests;

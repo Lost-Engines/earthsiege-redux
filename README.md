@@ -40,14 +40,14 @@ During the first turn in demo 2, the DOS sky and ground can leave a strip of a p
 
 ### Model detail and draw distance
 
-`--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. At `2.0` each switch happens twice as far from the model. The Shapes setting determines the finest detail available.
+`--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. The Shapes setting determines the finest detail available.
 
-`--distance-cutoff-multiplier N` scales how far you can see buildings, HERCs and terrain models. At `2.0` each remains visible to twice its usual range. Both options default to `1.0` and accept positive fractions such as `0.5`. Fog follows the mission's original distances. Objects visible beyond those distances keep their farthest tint.
+`--distance-cutoff-multiplier N` scales how far you can see buildings, HERCs and terrain models. Both multipliers default to `10`, ten times the original distances. You can set either one to `1` for the DOS distance or use a positive fraction for a shorter range. Fog follows the mission's original distances. Objects visible beyond those distances keep their farthest tint.
 
 In DOS, a distant building could lose its silhouette in the haze while its painted panels still stood out. Redux fades model textures through the same distance bands as the solid faces. Up close you see the original texture lighting. Farther out, the markings pick up the fog colour for their material and time of day.
 
 ```sh
-./build/earthsiege --demo 2 --lod-distance-multiplier 2.0 --distance-cutoff-multiplier 2.0
+./build/earthsiege --demo 2 --lod-distance-multiplier 1 --distance-cutoff-multiplier 1
 ```
 
 ### Demos

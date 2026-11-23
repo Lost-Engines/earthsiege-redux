@@ -48,8 +48,8 @@ enum class scene_shading {
 };
 
 struct view_distances {
-  double lod{1.0};
-  double cutoff{1.0};
+  double lod{10.0};
+  double cutoff{10.0};
 };
 
 struct scene_draw_observation {

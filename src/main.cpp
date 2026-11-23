@@ -109,8 +109,8 @@ auto main(int argc, char *argv[])->int try {
         "  --soundfont PATH      SoundFont for the General MIDI music option\n"
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
-        "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 1.0, higher keeps detail farther away)\n"
-        "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 1.0)\n"
+        "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 10, higher keeps detail farther away)\n"
+        "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 10)\n"
         "  --scale N             Initial window size as a multiple of 320x200\n"
         "  --skip-intro          Skip opening and pilot-death cinematics (original -a)\n";
 #ifndef NDEBUG
