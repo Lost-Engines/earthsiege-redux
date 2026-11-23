@@ -24,10 +24,10 @@ scenery_renderer::scenery_renderer(framebuffer &buffer, scenery_world const &sou
     colours{source.colours()},
     shading{source.environment(), std::move(bindings), cutoff_multiplier},
     ground_flash_cutoff{30000.0 * cutoff_multiplier},
-    models{buffer, colours},
+    models{buffer, colours, source.colours()},
     palette_mode{mode} {
-  if(palette_mode == scene_shading::distance) shading.prepare_texture_shades(colours, models.texture_lighting());
-  else apply_cockpit_map_shading(colours);
+  if(palette_mode == scene_shading::distance) shading.prepare_model_shades(colours, models.texture_lighting());
+  else if(palette_mode == scene_shading::cockpit_map) apply_cockpit_map_shading(colours);
 }
 
 std::vector<size_t> scenery_renderer::draw(vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<light const> lights, bool const split_highlights, std::span<scene_model const> const actors, effect_lighting * const dynamic, std::span<ground_flash const> const ground, model_view view) {
@@ -105,7 +105,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
       auto const &object{actors[index - objects.size()]};
       if(auto const *ribbon{std::get_if<scene_ribbon>(&object)}) {
         if(dynamic) dynamic->select(ribbon->position, 0);
-        if(palette_mode == scene_shading::distance) shading.apply(colours, distance, 3, 0, split_highlights);
+        if(palette_mode != scene_shading::cockpit_map) shading.apply(colours, distance, 3, 0, split_highlights);
         for(auto const &face : ribbon->faces) {
           std::array<camera_vertex, 4> vertices;
           for(size_t point{0}; point != face.size(); ++point) vertices[point].position = world_point(ribbon->points[face[point]], view.camera);
@@ -131,7 +131,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
       }
       auto const &actor{std::get<scene_model>(object)};
       auto const radius{actor.roots.front().header.radius};
-      auto const *texture_shades{palette_mode == scene_shading::distance ? shading.apply(colours, distance, actor.native_class, radius, split_highlights) : nullptr};
+      auto const *fog{palette_mode == scene_shading::cockpit_map ? nullptr : shading.apply(colours, distance, actor.native_class, radius, split_highlights)};
       auto const object_lights{dynamic ? dynamic->select(actor.placement.translation, radius) : lights};
       auto const &placement{actor.placement};
       auto const eye{inverse_transform(compose_transforms(placement, view.camera)).translation};
@@ -147,14 +147,14 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
         } else if(actor.native_class == 6) actor_view.detail.bias = shapes->ordinary;
       }
       if(observe) observe({vec3<int32_t>{placement.translation}, actor.native_class, distance, radius, root, object_lights});
-      models.draw(actor.roots[root], actor.instance, placement, actor_view, actor.textures, object_lights, actor.attachments, texture_shades);
+      models.draw(actor.roots[root], actor.instance, placement, actor_view, actor.textures, object_lights, actor.attachments, fog);
       continue;
     }
     auto const &object{objects[index]};
     auto const &root{world.terrain().roots.at(object.shape)};
-    auto const *texture_shades{palette_mode == scene_shading::distance ? shading.apply(colours, distance, 0, root.header.radius, split_highlights) : nullptr};
+    auto const *fog{palette_mode == scene_shading::cockpit_map ? nullptr : shading.apply(colours, distance, 0, root.header.radius, split_highlights)};
     auto const object_lights{dynamic ? dynamic->select(object.placement.translation, root.header.radius) : lights};
-    models.draw(root, object.model, object.placement, view, world.textures(), object_lights, {}, texture_shades);
+    models.draw(root, object.model, object.placement, view, world.textures(), object_lights, {}, fog);
   }
   return order;
 }

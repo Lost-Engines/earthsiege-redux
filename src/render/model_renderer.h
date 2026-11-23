@@ -33,14 +33,16 @@ int classify_model_bounds(part_header const &header, model_transform const &tran
 class model_renderer {
   framebuffer &target;
   palette const &colours;
+  palette const &authored_colours;
   texture_shade_maps texture_shades;
 
 public:
   model_renderer(framebuffer &target, palette const &colours);
+  model_renderer(framebuffer &target, palette const &colours, palette const &authored_colours);
   texture_shade_maps const &texture_lighting() const {
     return texture_shades;
   }
-  void draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> textures, std::span<light const> lights, std::span<model_attachment const> attachments = {}, texture_shade_maps const *fogged_textures = nullptr);
+  void draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> textures, std::span<light const> lights, std::span<model_attachment const> attachments = {}, model_fog_band const *fog = nullptr);
 };
 
 } // namespace earthsiege

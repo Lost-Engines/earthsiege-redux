@@ -44,7 +44,7 @@ During the first turn in demo 2, the DOS sky and ground can leave a strip of a p
 
 `--distance-cutoff-multiplier N` scales how far you can see buildings, HERCs and terrain models. Both multipliers default to `10`, ten times the original distances. You can set either one to `1` for the DOS distance or use a positive fraction for a shorter range. Fog follows the mission's original distances. Objects visible beyond those distances keep their farthest tint.
 
-In DOS, a distant building could lose its silhouette in the haze while its painted panels still stood out. Redux fades model textures through the same distance bands as the solid faces. Up close you see the original texture lighting. Farther out, the markings pick up the fog colour for their material and time of day.
+In DOS, a distant building could lose its silhouette in the haze while its painted panels still stood out. Redux fades textures and fixed model colours through the mission's distance bands. Up close, a gun tower's barrel openings turn from black to bright colours as it fires. With distance, the haze softens the flash and dark details on HERC weapons until they take on the local fog colour.
 
 ```sh
 ./build/earthsiege --demo 2 --lod-distance-multiplier 1 --distance-cutoff-multiplier 1
@@ -52,12 +52,14 @@ In DOS, a distant building could lose its silhouette in the haze while its paint
 
 ### Impact fragments
 
-`--fragment-count-multiplier N` scales the maximum number of loose pieces thrown by each impact burst. The game normally rolls from zero to 2, 4 or 6 pieces, depending on the damage. At `2` the maxima are 4, 8 and 12. Fractions round the maximum down. The default is `1`. At `0`, hits can still knock a weapon off its mount.
+`--fragment-count-multiplier N` scales the maximum number of loose pieces thrown by each impact burst. At the Redux default of `4`, hits can throw from zero to 8, 16 or 24 pieces, depending on the damage. Fractions round the maximum down. At `0`, hits can still knock a weapon off its mount.
 
-`--fragment-pool-size N` limits how many loose pieces and detached weapons can be in flight at once. The default is `150`. Once the pool fills, further pieces are dropped until a slot opens. A pool of `0` hides both kinds of debris. Damage, smoke and explosions still work.
+`--fragment-pool-size N` limits how many loose pieces and detached weapons can be in flight at once. The default is `600`. Once the pool fills, further pieces are dropped until a slot opens. A pool of `0` hides both kinds of debris. Damage, smoke and explosions still work.
+
+To play with the original debris density, use the DOS limits.
 
 ```sh
-./build/earthsiege --demo 2 --fragment-pool-size 600 --fragment-count-multiplier 4
+./build/earthsiege --demo 2 --fragment-pool-size 150 --fragment-count-multiplier 1
 ```
 
 ### Randomness and recorded demos

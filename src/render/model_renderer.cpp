@@ -52,10 +52,37 @@ public:
   }
 };
 
+struct surface_colours {
+  palette const &active;
+  palette const &authored;
+  texture_shade_maps const &textures;
+  model_fog_band const *fog;
+
+  struct material_ramp {
+    std::span<uint16_t const> inks;
+    palette_ink_map const *fog;
+  };
+
+  material_ramp ramp(uint16_t slot) const {
+    // Bound ramps already contain the distance shades for this object.
+    if(fog && !fog->mapped_ramps.test(slot)) return {authored.shade_ramps.at(slot), &fog->fixed_inks};
+    return {active.shade_ramps.at(slot), nullptr};
+  }
+
+  uint8_t solid(uint32_t material) const {
+    if(material >> 24 == 4) {
+      auto const selected{ramp(static_cast<uint16_t>(material))};
+      auto const ink{shade_colour(selected.inks, static_cast<uint8_t>(material >> 16))};
+      return selected.fog ? (*selected.fog)[ink] : ink;
+    }
+    auto const ink{static_cast<uint8_t>(material)};
+    return fog ? fog->fixed_inks[ink] : ink;
+  }
+};
+
 class model_draw {
   framebuffer &target;
-  palette const &colours;
-  texture_shade_maps const &texture_shades;
+  surface_colours const &colours;
   model_instance const &instance;
   model_transform const &object;
   model_view const &view;
@@ -93,7 +120,7 @@ class model_draw {
   void solid(std::span<projected_vertex const> const vertices, uint32_t const material, bool const outline = false) {
     auto const mode{material >> 24};
     if(mode != 0 && mode != 4) return;
-    auto const colour{mode == 4 ? shade_colour(colours.shade_ramps.at(material & 65535), static_cast<uint8_t>(material >> 16)) : static_cast<uint8_t>(material)};
+    auto const colour{colours.solid(material)};
     std::vector<vec2<int32_t>> points;
     points.reserve(vertices.size());
     for(auto const &vertex : vertices) points.push_back(vertex.position);
@@ -171,9 +198,10 @@ class model_draw {
       for(size_t index{0}; index < projected.size() / 2; ++index) std::swap(projected[index].position, projected[projected.size() - 1 - index].position);
     }
     if(texture) {
-      draw_textured_polygon(target, projected, *texture, view.bounds, texture_shades[texture_shade_index(intensity)], target.clip() ? texture_scan_direction::rows : texture_scan_direction::columns);
+      draw_textured_polygon(target, projected, *texture, view.bounds, colours.textures[texture_shade_index(intensity)], target.clip() ? texture_scan_direction::rows : texture_scan_direction::columns);
     } else if(gouraud && projected.size() >= 3) {
-      draw_gouraud_polygon(target, projected, colours.shade_ramps.at(fill & 65535), view.bounds);
+      auto const ramp{colours.ramp(static_cast<uint16_t>(fill))};
+      draw_gouraud_polygon(target, projected, ramp.inks, view.bounds, ramp.fog);
     } else {
       solid(projected, fill);
     }
@@ -230,10 +258,9 @@ class model_draw {
   }
 
 public:
-  model_draw(framebuffer &buffer, palette const &palette_data, texture_shade_maps const &shades, model_instance const &model, model_transform const &placement, model_view const &camera, std::span<bitmap const> const bank, std::span<light const> const sources, std::span<uint16_t const> const frames, std::span<model_attachment const> const replacements, model_light_cache &cached_lights)
+  model_draw(framebuffer &buffer, surface_colours const &palette_data, model_instance const &model, model_transform const &placement, model_view const &camera, std::span<bitmap const> const bank, std::span<light const> const sources, std::span<uint16_t const> const frames, std::span<model_attachment const> const replacements, model_light_cache &cached_lights)
     : target{buffer},
       colours{palette_data},
-      texture_shades{shades},
       instance{model},
       object{placement},
       view{camera},
@@ -253,7 +280,7 @@ public:
         if(found->geometry) {
           auto weapon_view{view};
           if(view.weapon_detail_bias) weapon_view.detail.bias = *view.weapon_detail_bias;
-          model_draw{target, colours, texture_shades, instance, object, weapon_view, found->textures, lights, found->cells, {}, light_cache}.part(*found->geometry);
+          model_draw{target, colours, instance, object, weapon_view, found->textures, lights, found->cells, {}, light_cache}.part(*found->geometry);
           // The original weapon wrapper restores the global bias to zero,
           // rather than restoring the enclosing HERC's value.
           if(view.weapon_detail_bias) active_detail.bias = 0;
@@ -306,18 +333,24 @@ int classify_model_bounds(part_header const &header, model_transform const &tran
 }
 
 model_renderer::model_renderer(framebuffer &buffer, palette const &palette_data)
+  : model_renderer{buffer, palette_data, palette_data} {
+}
+
+model_renderer::model_renderer(framebuffer &buffer, palette const &palette_data, palette const &original)
   : target{buffer},
     colours{palette_data},
+    authored_colours{original},
     texture_shades{make_texture_shades(palette_data)} {
 }
 
-void model_renderer::draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> const textures, std::span<light const> const lights, std::span<model_attachment const> const attachments, texture_shade_maps const *const fogged_textures) {
+void model_renderer::draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> const textures, std::span<light const> const lights, std::span<model_attachment const> const attachments, model_fog_band const *const fog) {
   if(view.cull_bounds && !classify_model_bounds(source.header, compose_transforms(object, view.camera), view.projection, view.bounds, false)) return;
   auto raster_view{view};
   raster_view.projection.output = target.size();
   raster_view.bounds = target.size().from_logical(view.bounds);
   model_light_cache cache{lights, object, instance.transforms().size()};
-  model_draw{target, colours, fogged_textures ? *fogged_textures : texture_shades, instance, object, raster_view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);
+  surface_colours const paints{colours, authored_colours, fog ? fog->textures : texture_shades, fog};
+  model_draw{target, paints, instance, object, raster_view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);
 }
 
 } // namespace earthsiege

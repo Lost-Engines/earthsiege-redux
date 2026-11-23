@@ -47,7 +47,7 @@ int main(int const argc, char **argv) try {
   for(unsigned int trace{0}; trace != traces; ++trace) {
     auto const ratio{file.integer<int16_t>()};
     earthsiege::random_state random{random_state(file)};
-    earthsiege::world_effects world{resources};
+    earthsiege::world_effects world{resources, {}, false, {150, 1.0}};
     auto const frame_count{file.integer<uint16_t>()};
     for(unsigned int frame{0}; frame != frame_count; ++frame) {
       auto const label{std::to_string(trace) + '/' + std::to_string(frame)};

@@ -41,6 +41,13 @@ void check_bursts(resource_store const &resources) {
     }
   }
   auto const &heavy{groups.back()};
+  world_effects defaults{resources};
+  require(defaults.live_particles().available() == 600, "default fragment pool size");
+  auto expected_rolls{random_state::seeded(29)};
+  auto default_rolls{random_state::seeded(29)};
+  auto const expected{create_debris_burst(heavy, {}, expected_rolls, 4.0, 600).size()};
+  defaults.add_debris(static_cast<int16_t>(groups.size() - 1), {}, default_rolls);
+  require(defaults.live_particles().size() == expected, "default fragment burst density");
   require(create_debris_burst(heavy, {}, rolls, std::numeric_limits<double>::max(), 2).size() == 2, "huge multiplier respects free slots");
   require(create_debris_burst(heavy, {}, rolls, 4, 0).empty(), "full pool");
 

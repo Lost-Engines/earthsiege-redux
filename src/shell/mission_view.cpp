@@ -68,7 +68,7 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
     impact_colours{read_palette(resources.read("simvol0", "dpl/IMPACT1.DPL"))},
     lift_artwork{read_bitmaps(resources.read("simvol0", "dba/INTRO.DBA")).at(0)},
     environment{resources, session->scenery().environment()},
-    renderer{world_target, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), scene_shading::distance, distances.cutoff},
+    renderer{world_target, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), distances.shading, distances.cutoff},
     camera{session->make_camera(camera_mode::attached)},
     external_actor{session->player_id()} {
   // The shipped file is an external input policy, separate from PREFS.CFG.

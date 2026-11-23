@@ -28,7 +28,7 @@ int main(int const argc, char **argv) try {
     };
     earthsiege::scenery_world world{resources, mission};
     earthsiege::framebuffer frame;
-    earthsiege::scenery_renderer renderer{frame, world, bindings};
+    earthsiege::scenery_renderer renderer{frame, world, bindings, earthsiege::scene_shading::dos_distance};
     std::array const lights{earthsiege::default_world_light()};
     auto const count{file.integer<uint16_t>()};
     for(unsigned int row{0}; row != count; ++row) {

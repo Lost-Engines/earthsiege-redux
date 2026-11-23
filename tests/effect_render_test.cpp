@@ -41,9 +41,9 @@ int main(int const argc, char **argv) try {
   auto const cases{file.integer<uint16_t>()};
   for(size_t row{0}; row != cases; ++row) {
     earthsiege::scenery_world terrain{resources, mission};
-    earthsiege::world_effects effects{resources};
+    earthsiege::world_effects effects{resources, {}, false, {150, 1.0}};
     earthsiege::framebuffer frame;
-    earthsiege::scenery_renderer renderer{frame, terrain, bindings};
+    earthsiege::scenery_renderer renderer{frame, terrain, bindings, earthsiege::scene_shading::dos_distance};
     earthsiege::random_state rng{random(file)};
     auto const requests{file.integer<uint16_t>()};
     for(size_t index{0}; index != requests; ++index) {

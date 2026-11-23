@@ -76,11 +76,14 @@ std::vector<palette_band> split_gouraud_triangle(std::array<vec2<int32_t>, 3> co
   return result;
 }
 
-void draw_gouraud_triangle(framebuffer &target, std::array<vec2<int32_t>, 3> const &points, std::array<uint8_t, 3> const colours, rectangle const bounds) {
-  for(auto const &band : split_gouraud_triangle(points, colours)) draw_solid_polygon(target, std::span{band.points}.first(band.vertex_count), bounds, band.colour, polygon_winding::preserve);
+void draw_gouraud_triangle(framebuffer &target, std::array<vec2<int32_t>, 3> const &points, std::array<uint8_t, 3> const colours, rectangle const bounds, palette_ink_map const *const fog) {
+  for(auto const &band : split_gouraud_triangle(points, colours)) {
+    auto const ink{fog ? (*fog)[band.colour] : band.colour};
+    draw_solid_polygon(target, std::span{band.points}.first(band.vertex_count), bounds, ink, polygon_winding::preserve);
+  }
 }
 
-void draw_gouraud_polygon(framebuffer &target, std::span<projected_vertex const> const vertices, std::span<uint16_t const> const ramp, rectangle const bounds) {
+void draw_gouraud_polygon(framebuffer &target, std::span<projected_vertex const> const vertices, std::span<uint16_t const> const ramp, rectangle const bounds, palette_ink_map const *const fog) {
   if(vertices.size() < 3) return;
   std::vector<uint8_t> colours;
   colours.reserve(vertices.size());
@@ -90,7 +93,7 @@ void draw_gouraud_polygon(framebuffer &target, std::span<projected_vertex const>
   }
   for(size_t index{2}; index != vertices.size(); ++index) {
     std::array<vec2<int32_t>, 3> const points{vec2<int32_t>{vertices[0].position}, vec2<int32_t>{vertices[index - 1].position}, vec2<int32_t>{vertices[index].position}};
-    draw_gouraud_triangle(target, points, {colours[0], colours[index - 1], colours[index]}, bounds);
+    draw_gouraud_triangle(target, points, {colours[0], colours[index - 1], colours[index]}, bounds, fog);
   }
 }
 

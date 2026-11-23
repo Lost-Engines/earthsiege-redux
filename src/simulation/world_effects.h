@@ -13,8 +13,8 @@ namespace earthsiege {
 class resource_store;
 inline size_t constexpr explosion_capacity{40};
 struct fragment_settings {
-  uint32_t pool_size{150};
-  double count_multiplier{1.0};
+  uint32_t pool_size{600};
+  double count_multiplier{4.0};
 };
 inline size_t constexpr smoke_puff_capacity{200};
 inline size_t constexpr smoke_emitter_capacity{20};

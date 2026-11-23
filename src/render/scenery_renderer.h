@@ -44,12 +44,14 @@ struct ground_flash {
 /// Render owned scenery with the original distance ramps and whole-scene painter tree
 enum class scene_shading {
   distance,
+  dos_distance, // Only the material ramps listed in SHADES.DAT receive fog.
   cockpit_map
 };
 
 struct view_distances {
   double lod{10.0};
   double cutoff{10.0};
+  scene_shading shading{scene_shading::distance};
 };
 
 struct scene_draw_observation {

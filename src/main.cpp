@@ -119,8 +119,8 @@ auto main(int argc, char *argv[])->int try {
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
         "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 10, higher keeps detail farther away)\n"
         "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 10)\n"
-        "  --fragment-pool-size N       Maximum airborne fragments and detached weapons (default: 150)\n"
-        "  --fragment-count-multiplier N  Scale the maximum fragments per burst (default: 1, zero disables bursts)\n"
+        "  --fragment-pool-size N       Maximum airborne fragments and detached weapons (default: 600)\n"
+        "  --fragment-count-multiplier N  Scale the maximum fragments per burst (default: 4, zero disables bursts)\n"
         "  --scale N             Initial window size as a multiple of 320x200\n"
         "  --skip-intro          Skip opening and pilot-death cinematics (original -a)\n";
 #ifndef NDEBUG
