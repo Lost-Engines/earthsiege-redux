@@ -4,10 +4,10 @@
 
 namespace earthsiege {
 cockpit_displays::cockpit_displays(resource_store const &resources, cockpit_layout const &layout,
-  mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view, double const lod_multiplier)
+  mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view, view_distances const distances)
   : random{ui_random},
     world_to_camera{scene_view},
-    lod_distance_multiplier{lod_multiplier},
+    lod_distance_multiplier{distances.lod},
     failure_font{read_font(resources.read("simvol0", "dfn/CPRED.DFN"))},
     failure_label{read_interface_strings(resources.read("simvol0", "str/STRINGS0.STR")).at(30).at(0).text},
     controls{resources, layout},
@@ -17,7 +17,7 @@ cockpit_displays::cockpit_displays(resource_store const &resources, cockpit_layo
     target{resources},
     scanner{resources},
     navigation{cache, session.scenery()},
-    missile{resources, cache, session.scenery()} {
+    missile{resources, cache, session.scenery(), distances.cutoff} {
   auto const bounds{controls.button_bounds()};
   for(size_t i{0}; i < buttons.size(); ++i) buttons[i] = input.add_button(bounds[i]);
   auto const row_bounds{communications.row_bounds(controls.display_bounds())};

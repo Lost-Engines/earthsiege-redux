@@ -6,9 +6,7 @@ TFX. SDL is no longer a dependency.
 
 Redux uses the GLFW framebuffer dimensions as its render resolution. A fixed
 `--resolution WIDTHxHEIGHT` sets the render target independently of the window.
-`--scale N` sets the initial window size in multiples of 320×200. Screenshots
-include the whole render canvas and its borders. With no window or fixed
-resolution, the target is 320×200.
+`--scale N` sets the initial window size in multiples of 320×200.
 
 The software renderer projects world geometry into the pixels available inside
 the original 8:5 picture. The ground sampler uses the selected resolution and
@@ -22,22 +20,26 @@ colour. A fully covered scene needs no world texture upload. The shader and
 the screenshot renderer use the same nearest-neighbour cell boundaries. Mouse
 input and cursor warps use the same fitted rectangle, including on HiDPI displays.
 
-The sky bands and ground texture round their edges separately when the HERC
-banks. Some pixels at the foot of the panorama sit between those edges. DOS
-alternates between two VGA pages, so these pixels keep the terrain or scenery
-last drawn on that page. Redux keeps both pages at the selected resolution.
-At the end of a horizontal cockpit pan the game copies the incoming view to
-the other page before it resumes flipping between them. The first turn in
-retail demo 2 shows both behaviours.
+The sky bands and ground texture round their edges separately when the HERC banks.
+In retail demo 2 this leaves a thin strip behind a passing building on alternating VGA
+pages. Redux starts each world render in the mission's far-ground colour. Cockpit
+pans still scroll the two saved pages at the selected resolution.
 
 The launch lift has shorter frame intervals than ordinary driving. The first
 115 frames of retail demo 2 take 3.296 seconds on its recorded clock. To replay
 the lift and its final shake at 4K, run
-`./build/earthsiege --original --demo 2 --resolution 3840x2160 --frames 150`.
+`./build/earthsiege --original --demo 2 --resolution 3840x2160`.
 At high resolutions, the ground rasterizer shares large draws across CPU cores.
 With a level horizon it calculates depth and fog once per scanline. The horizon
 bitmap scales by filling the screen area covered by each run of like-coloured
 texels, leaving transparent pixels alone.
+
+Debug builds expose four developer switches. `--headless` runs without a
+window, `--frames N` stops after N presentations, `--screenshot PATH` writes
+the final frame as a PPM, and `--list-resources` prints resource sizes and
+checksums. For example, `--headless --inspect-demo 2 --screenshot frame.ppm`
+captures the starting cockpit at 320×200. Add `--resolution` for a larger
+capture. `--inspect-demo` is also available in player releases.
 
 GLFW callbacks append to an ordered input queue. A mission modal can stop
 consuming that queue and resume it at the original simulation call site, so a

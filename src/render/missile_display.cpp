@@ -50,9 +50,9 @@ missile_camera_frame missile_camera_tracker::advance(std::span<missile_camera_ob
   return result(missile_picture::idle);
 }
 
-missile_display::missile_display(resource_store const &resources, framebuffer &buffer, scenery_world const &world)
+missile_display::missile_display(resource_store const &resources, framebuffer &buffer, scenery_world const &world, double const cutoff_multiplier)
   : target{buffer},
-    scenery{buffer, world, read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), scene_shading::cockpit_map},
+    scenery{buffer, world, read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), scene_shading::cockpit_map, cutoff_multiplier},
     fonts{read_font(resources.read("simvol0", "dfn/CPRED.DFN")), read_font(resources.read("simvol0", "dfn/CPBLUE.DFN")), read_font(resources.read("simvol0", "dfn/CPYLW.DFN"))},
     strings{read_interface_strings(resources.read("simvol0", "str/STRINGS0.STR"))} {}
 

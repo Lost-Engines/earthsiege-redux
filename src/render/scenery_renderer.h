@@ -47,6 +47,11 @@ enum class scene_shading {
   cockpit_map
 };
 
+struct view_distances {
+  double lod{1.0};
+  double cutoff{1.0};
+};
+
 struct scene_draw_observation {
   vec3<int32_t> position;
   int16_t native_class;
@@ -62,6 +67,7 @@ class scenery_renderer {
   scenery_world const &world;
   palette colours;
   distance_shading shading;
+  double ground_flash_cutoff;
   model_renderer models;
   scene_shading palette_mode;
   std::optional<shape_preferences> shapes;
@@ -72,7 +78,8 @@ public:
   model_transform const &last_view_transform() const {
     return world_to_camera;
   }
-  scenery_renderer(framebuffer &target, scenery_world const &world, distance_shade_bindings bindings, scene_shading palette_mode = scene_shading::distance);
+  scenery_renderer(framebuffer &target, scenery_world const &world, distance_shade_bindings bindings, scene_shading palette_mode = scene_shading::distance,
+                   double cutoff_multiplier = 1.0);
   void shape_detail(uint8_t value) {
     shapes = earthsiege::shape_detail(value);
   }

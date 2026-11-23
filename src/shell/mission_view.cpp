@@ -33,20 +33,20 @@ std::unique_ptr<mission_session> demo_start(resource_store const &resources, inp
 
 } // anonymous namespace
 
-mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music, double const lod_multiplier)
-  : mission_view{resources, demo_tape(resources, demo), music, lod_multiplier} {}
-mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music, double const lod_multiplier)
-  : mission_view{resources, demo_start(resources, tape), music, lod_multiplier} {
+mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music, view_distances const distances)
+  : mission_view{resources, demo_tape(resources, demo), music, distances} {}
+mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music, view_distances const distances)
+  : mission_view{resources, demo_start(resources, tape), music, distances} {
   session->playback(true);
   // Playback restores files beside the TAP, while runtime controls still read
   // DATA/PREFS.CFG and DATA/KEYJOY.CFG. The caller supplies installed preferences.
 }
 
-mission_view::mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music, double const lod_multiplier)
+mission_view::mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music, view_distances const distances)
   : session{std::move(mission)},
     ui_random{session->interface_random()},
     audio{resources, music},
-    lod_distance_multiplier{lod_multiplier},
+    lod_distance_multiplier{distances.lod},
     cockpit{read_cockpit(resources, read_resource_names(resources.read("simvol0", "nam/MECHS.NAM")).at(static_cast<size_t>(session->player_chassis())))},
     reactor{resources, cockpit.layout},
     throttle{resources, cockpit.layout},
@@ -68,7 +68,7 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
     impact_colours{read_palette(resources.read("simvol0", "dpl/IMPACT1.DPL"))},
     lift_artwork{read_bitmaps(resources.read("simvol0", "dba/INTRO.DBA")).at(0)},
     environment{resources, session->scenery().environment()},
-    renderer{world_target, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT"))},
+    renderer{world_target, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), scene_shading::distance, distances.cutoff},
     camera{session->make_camera(camera_mode::attached)},
     external_actor{session->player_id()} {
   // The shipped file is an external input policy, separate from PREFS.CFG.
@@ -127,8 +127,8 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
   });
   radio->speech_output([this](std::string_view path){return audio.speech(path);});
   session->on_radio([this](radio_event const &event){radio->submit(event, interface_ticks);});
-  displays = std::make_unique<cockpit_displays>(resources, cockpit.layout, *session, instruments, ui_random, renderer.last_view_transform(), lod_multiplier);
-  hdd = std::make_unique<cockpit_hdd>(resources, cockpit.layout, *session, instruments, ui_random, lod_multiplier);
+  displays = std::make_unique<cockpit_displays>(resources, cockpit.layout, *session, instruments, ui_random, renderer.last_view_transform(), distances);
+  hdd = std::make_unique<cockpit_hdd>(resources, cockpit.layout, *session, instruments, ui_random, distances.lod);
   for(size_t i{0}; i < edge_controls.size(); ++i) edge_controls[i] = instruments.add_button(cockpit_edge_bounds(0)[i]);
   auto const origin{instrument_origin()};
   displays->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
@@ -882,14 +882,14 @@ void mission_view::draw() {
   if(session->recording_paused() && !options_camera) {
     frame.restore_world(world_frame, mask);
   } else if(presentation.view != 1 || presentation.prepared) {
-    // The rolled sky and ground can leave pixels untouched. DOS keeps
-    // whatever was last drawn at those coordinates on this VGA page.
-    if(!options_camera) surface.sample(frame, page_x, page_y, &mask);
-    world_target = frame.resampled(scene_size);
-    // The detailed image is composited through the authored window after
-    // rasterization. The reference rasterizer applies its spans per primitive.
+    // The sky and ground round their banked edges independently. Start the
+    // world in its far-ground colour so a gap cannot expose an earlier frame.
+    auto const &background{session->scenery().environment().background};
+    auto const horizon_colour{static_cast<uint8_t>(background.ground_palette_start + background.ground_bands - 1)};
     bool const original{scene_size == render_size{}};
+    world_target = original ? frame : framebuffer{scene_size, horizon_colour};
     world_target.clip(&mask);
+    if(original) world_target.fill(view.bounds, horizon_colour);
     // 25b68 passes the cockpit's authored layout offset to 26264. The
     // projection centre alone leaves uncovered sky in an off-centre side view.
     auto const background_offset{inside ? vec2<int32_t>{window.instrument_origin[0], window.instrument_origin[1]} : vec2<int32_t>{0, 0}};

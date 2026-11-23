@@ -1,5 +1,7 @@
 #include "distance_shading.h"
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 #include "simulation/fixed_math.h"
@@ -59,9 +61,21 @@ distance_shade_bindings read_distance_shade_bindings(bytes const source) {
   return result;
 }
 
-distance_shading::distance_shading(world_environment const &source, distance_shade_bindings mapping)
+distance_shading::distance_shading(world_environment const &source, distance_shade_bindings mapping, double const cutoff_multiplier)
   : environment{source},
     bindings{std::move(mapping)} {
+  if(!std::isfinite(cutoff_multiplier) || cutoff_multiplier <= 0) throw std::invalid_argument{"invalid visibility distance multiplier"};
+  if(source.distance_bands[0].empty() || source.distance_bands[1].empty()) throw std::invalid_argument{"empty distance bands"};
+  // Scale the final world-space cutoff, including each building size's allowance.
+  // The palette bands below continue to use the actual camera distance.
+  auto const scale_cutoff{[cutoff_multiplier](int64_t distance) {
+    if(distance < 0) return int64_t{-1};
+    return static_cast<int64_t>(std::min(static_cast<double>(distance) * cutoff_multiplier, static_cast<double>(std::numeric_limits<uint32_t>::max())));
+  }};
+  int64_t const actor_range{static_cast<uint32_t>(source.distance_bands[0].back())};
+  terrain_cutoff = scale_cutoff(static_cast<uint32_t>(source.distance_bands[1].back()));
+  actor_cutoff = scale_cutoff(actor_range);
+  for(size_t i{0}; i < ground_target_cutoffs.size(); ++i) ground_target_cutoffs[i] = scale_cutoff(actor_range - source.model_distance_offsets[i]);
   if(source.near_ranges.size() != source.far_ranges.size()) throw std::invalid_argument{"distance palette columns differ"};
   for(size_t index{0}; index != source.near_ranges.size(); ++index) bands.push_back(interpolate_ranges(source.near_ranges[index], source.far_ranges[index], source.shade_levels));
   highlights = interpolate_ranges(source.blend_ranges[0], source.blend_ranges[1], source.shade_levels);
@@ -77,13 +91,9 @@ size_t distance_shading::band(int32_t distance, int16_t const native_class, int1
 }
 
 bool distance_shading::culled(int32_t distance, int16_t const native_class, int16_t const radius) const {
-  if(native_class == ground_target_class || native_class == effect_class) {
-    auto const offset{environment.model_distance_offsets[native_class == ground_target_class && radius >= large_model_radius ? 1 : 0]};
-    distance = std::max(0, wrap_long(static_cast<int64_t>(distance) + offset));
-  }
-  auto const &distances{environment.distance_bands[native_class == terrain_class ? 1 : 0]};
-  if(distances.empty()) throw std::runtime_error{"empty distance bands"};
-  return static_cast<uint32_t>(distance) > static_cast<uint32_t>(distances.back());
+  if(native_class == ground_target_class) return distance > ground_target_cutoffs[radius >= large_model_radius ? 1 : 0];
+  if(native_class == effect_class) return distance > ground_target_cutoffs[0];
+  return static_cast<uint32_t>(distance) > (native_class == terrain_class ? terrain_cutoff : actor_cutoff);
 }
 
 void distance_shading::apply(palette &target, int32_t const distance, int16_t const native_class, int16_t const radius, bool const split_highlights) const {

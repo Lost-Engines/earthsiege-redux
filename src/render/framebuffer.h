@@ -53,7 +53,7 @@ class framebuffer {
 
 public:
   framebuffer() : framebuffer{render_size{}} {}
-  explicit framebuffer(render_size size);
+  explicit framebuffer(render_size size, uint8_t colour = 0);
   framebuffer(render_size size, std::span<uint8_t const> pixels);
   render_size size() const { return extent; }
   bool has_detail() const { return static_cast<bool>(detail); }

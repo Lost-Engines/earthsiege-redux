@@ -36,12 +36,16 @@ By default the game draws at the window's current pixel dimensions, including on
 
 The first command fixes the render size at 1280×800, even if you resize the window. The second opens a 960×600 window and follows subsequent resizes. The third gives the original 320×200 rendering in a 1280×800 window. Both editions accept the same options.
 
-### Model detail
+During the first turn in demo 2, the DOS sky and ground can leave a strip of a passing building behind. Redux paints that gap with the world's far-ground colour.
 
-`--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. The default, `1.0`, uses the original distances. At `2.0` each switch happens twice as far from the model. At `0.5` it happens half as far away. The Shapes setting still determines the finest detail available, and each mission keeps its own visibility range.
+### Model detail and draw distance
+
+`--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. At `2.0` each switch happens twice as far from the model. The Shapes setting determines the finest detail available.
+
+`--distance-cutoff-multiplier N` scales how far you can see buildings, HERCs and terrain models. At `2.0` each remains visible to twice its usual range. Both options default to `1.0` and accept positive fractions such as `0.5`. Fog follows the mission's original distances. Objects visible beyond those distances keep their farthest tint.
 
 ```sh
-./build/earthsiege --demo 3 --lod-distance-multiplier 2.0
+./build/earthsiege --demo 2 --lod-distance-multiplier 2.0 --distance-cutoff-multiplier 2.0
 ```
 
 ### Demos
@@ -70,8 +74,6 @@ The MFD displays live status, communications, navigation, radar, target conditio
 This inspection mode uses mission AI, combat and objectives. It does not replay the recorded inputs. Normal missions are selected from the main menu; Q opens the original mission-status/return dialog, P pauses and Ctrl+Escape or Ctrl+Q asks to quit. F11 displays mission objectives. V opens the external view and N cycles through squad HERCs; Tab/Enter switches camera/HERC control for the player. See the [keyboard audit](docs/KEYBOARD.md) for corrected aliases and the restored original development shortcuts and edition differences.
 
 The original group dispatcher can read an uninitialized priority word for commands such as form up. This reconstruction uses neutral priority for those commands, making delivery deterministic. Radio queues start with zeroed unused indices. Original commander-message loading writes outside its descriptor table; this reconstruction retains the messages as resources and preserves their observed absence from radio output, without copying the memory corruption. The death-report portrait uses a zero offset, matching the captured original allocation; its offset is not initialized by the original asset loader.
-
-Screenshots use the selected render size. Headless runs default to 320×200. For example, `--headless --inspect-demo 2 --resolution 1920x1080 --screenshot frame.ppm` captures a 1920×1080 cockpit frame. Use `--frames N` to limit a run.
 
 Original game assets remain the property of their respective owners. Reverse-engineering notes and comparison tools live in the sibling `earthsiege-reverse` project.
 

@@ -21,9 +21,12 @@ class distance_shading {
   distance_shade_bindings bindings;
   std::vector<std::vector<palette_range>> bands;
   std::vector<palette_range> highlights;
+  int64_t terrain_cutoff;
+  int64_t actor_cutoff;
+  std::array<int64_t, 2> ground_target_cutoffs;
 
 public:
-  distance_shading(world_environment const &environment, distance_shade_bindings bindings);
+  distance_shading(world_environment const &environment, distance_shade_bindings bindings, double cutoff_multiplier = 1.0);
   size_t band(int32_t distance, int16_t native_class, int16_t radius) const;
   bool culled(int32_t distance, int16_t native_class, int16_t radius) const;
   void apply(palette &target, int32_t distance, int16_t native_class, int16_t radius, bool split_highlights = false) const;

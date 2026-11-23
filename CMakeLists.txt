@@ -351,6 +351,7 @@ add_library(earthsiege_core
   src/shell/dialog.cpp
   src/shell/dialog.h
   src/render/framebuffer.cpp
+  src/render/framebuffer_capture.cpp
   src/render/framebuffer.h
   src/resources/artwork.cpp
   src/resources/artwork.h

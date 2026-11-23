@@ -18,11 +18,12 @@ vec3<int32_t> world_point(vec3<int32_t> const &point, model_transform const &pla
 
 } // anonymous namespace
 
-scenery_renderer::scenery_renderer(framebuffer &buffer, scenery_world const &source, distance_shade_bindings bindings, scene_shading const mode)
+scenery_renderer::scenery_renderer(framebuffer &buffer, scenery_world const &source, distance_shade_bindings bindings, scene_shading const mode, double const cutoff_multiplier)
   : target{buffer},
     world{source},
     colours{source.colours()},
-    shading{source.environment(), std::move(bindings)},
+    shading{source.environment(), std::move(bindings), cutoff_multiplier},
+    ground_flash_cutoff{30000.0 * cutoff_multiplier},
     models{buffer, colours},
     palette_mode{mode} {
   if(palette_mode == scene_shading::cockpit_map) apply_cockpit_map_shading(colours);
@@ -43,7 +44,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
   for(auto const &flash : ground) {
     vec3<int32_t> delta;
     for(unsigned int axis{0}; axis != 3; ++axis) delta[axis] = wrap_long(static_cast<int64_t>(flash.position[axis]) - position[axis]);
-    if(fast_distance(delta) >= 30000) continue;
+    if(fast_distance(delta) >= ground_flash_cutoff) continue;
     flash.position.z = 0;
     auto placement{rotation_transform({0, 0, flash.heading})};
     placement.translation = flash.position;

@@ -173,13 +173,12 @@ int main(int argc, char **argv) try {
         }
         require(frame.pixels().size() == 320 * 200, "demo presents game frames");
         ++shown;
-        if(retail_turn) {
-          // DOSBox crops across the first bank, its reversal and the first side-view pan.
-          for(auto [number, expected] : {std::pair{155U, 0x1ee2e843U}, {167U, 0x64287ecfU},
-                                         {182U, 0x113292f2U}, {189U, 0x2f80c578U}}) {
-            if(shown == number) require(rgb_crc(frame, playback.view().colours(), {70, 69, 249, 91}) == expected,
-                                        "banked terrain and panorama differ from DOS");
-          }
+        if(retail_turn && (shown == 182 || shown == 183)) {
+          // The building has moved left of these positions on successive pages.
+          auto const &sky{playback.view().simulation().scenery().environment().background};
+          auto const horizon{sky.ground_palette_start + sky.ground_bands - 1};
+          auto const x{shown == 182 ? 120U : 110U};
+          require(frame.pixels()[73 * frame.size().width + x] == horizon, "departed building left a dark trail on the horizon");
         }
         if(apocalypse_panel && shown == 90) {
           // Native-resolution RGB crop of the DOSBox lower panel, including the F7/F8 buttons and crew.

@@ -22,9 +22,9 @@ Alt+Tab both leave playback running.
 The native View Demo menu chooses `1 + (current time in seconds % 4)`. It is a
 clock-based choice, not a sequence through the recordings. `--demo` overrides
 only the initial playback; later menu selections use the usual clock choice.
-`--frames` also bounds playback, and `--screenshot` saves the last displayed
-frame when that limit is reached. `--inspect-demo` remains a separate live
-inspection mode and cannot be combined with `--demo`.
+`--inspect-demo N` opens the same starting mission for live exploration.
+In Debug builds, `--frames N` limits playback to N presentations and
+`--screenshot PATH` saves the final frame.
 
 The DOS simulator also accepts named playback. From the installed game directory,
 with the usual CD mount and `ALT_DRIVE` environment in place, run:

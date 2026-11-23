@@ -19,6 +19,23 @@ int main(int const argc, char **argv) try {
     auto const environment{earthsiege::read_world_environment(resources.read("simvol0", "wld/WORLD" + std::to_string(world) + ".WLD"))};
     auto colours{earthsiege::read_palette(resources.read("simvol0", "dpl/WORLD" + std::to_string(world - world % 2) + ".DPL"))};
     earthsiege::distance_shading const shading{environment, earthsiege::read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT"))};
+    auto const actor_range{environment.distance_bands[0].back()};
+    auto const terrain_range{environment.distance_bands[1].back()};
+    for(double const multiplier : {0.5, 2.0}) {
+      earthsiege::distance_shading const scaled{environment, {}, multiplier};
+      auto const check_cutoff{[&](int16_t kind, int16_t radius, int range) {
+        auto const limit{static_cast<int32_t>(range * multiplier)};
+        if(scaled.culled(limit, kind, radius) || !scaled.culled(limit + 1, kind, radius)) file.fail("scaled visibility cutoff");
+        for(auto distance : environment.distance_bands[kind == 0 ? 1 : 0]) {
+          if(scaled.band(distance, kind, radius) != shading.band(distance, kind, radius)) file.fail("cutoff altered a fog band");
+        }
+      }};
+      check_cutoff(7, 1540, actor_range);
+      check_cutoff(0, 1000, terrain_range);
+      check_cutoff(5, 4999, actor_range - environment.model_distance_offsets[0]);
+      check_cutoff(5, 5000, actor_range - environment.model_distance_offsets[1]);
+      check_cutoff(8, 5000, actor_range - environment.model_distance_offsets[0]);
+    }
     auto const count{file.integer<uint32_t>()};
     for(unsigned int index{0}; index != count; ++index) {
       auto const kind{file.integer<int16_t>()};

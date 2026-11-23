@@ -43,11 +43,11 @@ auto integer_option(std::string_view text)->unsigned int {
   return result;
 }
 
-auto lod_distance_option(std::string_view text)->double {
+auto distance_multiplier_option(std::string_view option, std::string_view text)->double {
   double value{};
   auto const [end, error]{std::from_chars(text.data(), text.data() + text.size(), value)};
   if(error != std::errc{} || end != text.data() + text.size() || !std::isfinite(value) || value <= 0.0) {
-    throw std::runtime_error{"--lod-distance-multiplier expects a finite number greater than zero"};
+    throw std::runtime_error{std::string{option} + " expects a finite number greater than zero"};
   }
   return value;
 }
@@ -72,10 +72,14 @@ auto resolution_option(std::string_view text)->std::optional<earthsiege::render_
 auto main(int argc, char *argv[])->int try {
   auto const bundled_data{earthsiege::resource_store::locate(earthsiege::executable_path(argv[0]))};
   std::filesystem::path data_dir{bundled_data};
-  std::filesystem::path screenshot;
   std::filesystem::path save_directory;
+#ifndef NDEBUG
+  std::filesystem::path screenshot;
+  unsigned int frame_limit{0};
+  unsigned int frames{0};
   bool list{false};
   bool headless{false};
+#endif
   bool skip_intro{false};
   bool audio_setup{false};
   bool explicit_data{false};
@@ -85,12 +89,13 @@ auto main(int argc, char *argv[])->int try {
   std::optional<std::filesystem::path> requested_soundfont;
   unsigned int scale{0};
   std::optional<earthsiege::render_size> fixed_resolution;
-  double lod_distance_multiplier{1.0};
+  earthsiege::view_distances distances;
   std::optional<unsigned int> inspect_demo;
   std::optional<unsigned int> requested_demo;
-  unsigned int frame_limit{0};
   for(int index{1}; index < argc; ++index) {
     std::string_view const argument{argv[index]};
+    auto const separator{argument.find('=')};
+    auto const option{argument.substr(0, separator)};
     if(argument == "--help") {
       std::cout << "Earthsiege Redux\nUsage: earthsiege [options]\n"
         "  --data-dir PATH       Original game data (default: bundled assets)\n"
@@ -105,12 +110,16 @@ auto main(int argc, char *argv[])->int try {
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
         "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 1.0, higher keeps detail farther away)\n"
+        "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 1.0)\n"
         "  --scale N             Initial window size as a multiple of 320x200\n"
+        "  --skip-intro          Skip opening and pilot-death cinematics (original -a)\n";
+#ifndef NDEBUG
+      std::cout << "\nDeveloper options\n"
         "  --screenshot PATH     Save a PPM at the render resolution\n"
         "  --frames N            Exit after N frames\n"
-        "  --skip-intro          Skip opening and pilot-death cinematics (original -a)\n"
         "  --headless            Render a frame without creating a window\n"
         "  --list-resources      Print all original resource sizes and CRCs\n";
+#endif
       return EXIT_SUCCESS;
     }
     if(argument == "--data-dir" && index + 1 < argc) {
@@ -122,8 +131,6 @@ auto main(int argc, char *argv[])->int try {
       requested_edition = earthsiege::game_edition::expansion;
     } else if(argument == "--save-dir" && index + 1 < argc) {
       save_directory = argv[++index];
-    } else if(argument == "--screenshot" && index + 1 < argc) {
-      screenshot = argv[++index];
     } else if(argument == "--demo" && index + 1 < argc) {
       requested_demo = integer_option(argv[++index]);
     } else if(argument.starts_with("--demo=")) {
@@ -148,20 +155,26 @@ auto main(int argc, char *argv[])->int try {
       fixed_resolution = resolution_option(argv[++index]);
     } else if(argument.starts_with("--resolution=")) {
       fixed_resolution = resolution_option(argument.substr(13));
-    } else if(argument == "--lod-distance-multiplier" && index + 1 < argc) {
-      lod_distance_multiplier = lod_distance_option(argv[++index]);
-    } else if(argument.starts_with("--lod-distance-multiplier=")) {
-      lod_distance_multiplier = lod_distance_option(argument.substr(argument.find('=') + 1));
+    } else if(option == "--lod-distance-multiplier" || option == "--distance-cutoff-multiplier") {
+      std::string_view value{""};
+      if(separator != argument.npos) value = argument.substr(separator + 1);
+      else if(index + 1 < argc) value = argv[++index];
+      auto &multiplier{option == "--lod-distance-multiplier" ? distances.lod : distances.cutoff};
+      multiplier = distance_multiplier_option(option, value);
     } else if(argument == "--scale" && index + 1 < argc) {
       scale = integer_option(argv[++index]);
-    } else if(argument == "--frames" && index + 1 < argc) {
-      frame_limit = integer_option(argv[++index]);
     } else if(argument == "--skip-intro") {
       skip_intro = true;
+#ifndef NDEBUG
+    } else if(argument == "--screenshot" && index + 1 < argc) {
+      screenshot = argv[++index];
+    } else if(argument == "--frames" && index + 1 < argc) {
+      frame_limit = integer_option(argv[++index]);
     } else if(argument == "--headless") {
       headless = true;
     } else if(argument == "--list-resources") {
       list = true;
+#endif
     } else {
       throw std::runtime_error{"unknown or incomplete option: " + std::string{argument}};
     }
@@ -172,8 +185,13 @@ auto main(int argc, char *argv[])->int try {
   if(requested_demo && inspect_demo) {
     throw std::runtime_error{"--demo and --inspect-demo cannot be used together"};
   }
+#ifndef NDEBUG
   std::unique_ptr<earthsiege::window> display;
   if(!headless && !list) display = std::make_unique<earthsiege::window>(scale, fixed_resolution);
+#else
+  earthsiege::window game_window{scale, fixed_resolution};
+  auto *const display{&game_window};
+#endif
   auto const render_resolution{[&]{ return display ? display->resolution() : fixed_resolution.value_or(earthsiege::render_size{}); }};
   if(display && !explicit_data && !requested_edition && !inspect_demo && !requested_demo && std::filesystem::is_directory(data_dir / "expansion")) {
     earthsiege::resource_store original{data_dir};
@@ -184,6 +202,7 @@ auto main(int argc, char *argv[])->int try {
   earthsiege::resource_store const resources{data_dir};
   if(requested_edition && resources.edition() != *requested_edition) throw std::runtime_error{"selected game edition is unavailable in " + data_dir.string()};
   if(display && resources.edition() == earthsiege::game_edition::expansion) glfwSetWindowTitle(display->get(), "Earthsiege Redux - Expansion");
+#ifndef NDEBUG
   if(list) {
     for(auto const &[volume, archive] : resources.archives()) {
       for(auto const &[name, entry] : archive.entries()) {
@@ -192,11 +211,12 @@ auto main(int argc, char *argv[])->int try {
     }
     return EXIT_SUCCESS;
   }
+  if(headless && !frame_limit) frame_limit = 1;
+#endif
   if(save_directory.empty()) {
     save_directory = earthsiege::user_save_directory();
     if(resources.edition() == earthsiege::game_edition::expansion) save_directory /= "expansion";
   }
-  if(headless && !frame_limit) frame_limit = 1;
   auto const music_file{save_directory / "music.cfg"};
   auto music_settings{earthsiege::read_music_settings(music_file)};
   music_settings.program_directory = earthsiege::executable_path(argv[0]).parent_path();
@@ -204,7 +224,7 @@ auto main(int argc, char *argv[])->int try {
   if(requested_roms) music_settings.rom_directory = std::filesystem::absolute(*requested_roms);
   if(requested_soundfont) music_settings.soundfont = std::filesystem::absolute(*requested_soundfont);
   if(audio_setup) {
-    if(headless) throw std::runtime_error{"--audio-setup needs a window"};
+    if(!display) throw std::runtime_error{"--audio-setup needs a window"};
     if(auto chosen{earthsiege::choose_music_device(*display, resources, music_settings.device)}) {
       auto candidate{music_settings};
       candidate.device = *chosen;
@@ -225,7 +245,7 @@ auto main(int argc, char *argv[])->int try {
   earthsiege::framebuffer menu_frame;
   std::unique_ptr<earthsiege::mission_view> scene;
   if(inspect_demo) {
-    scene = std::make_unique<earthsiege::mission_view>(resources, *inspect_demo, music_settings, lod_distance_multiplier);
+    scene = std::make_unique<earthsiege::mission_view>(resources, *inspect_demo, music_settings, distances);
     scene->configure_input(menu.settings(), menu.device_calibrations());
     auto const p{scene->initial_pointer()};
     if(display) display->warp_mouse(p.x, p.y);
@@ -269,7 +289,6 @@ auto main(int argc, char *argv[])->int try {
   bool leave_mission{false};
   bool modal_command_pending{false};
   bool focused{!display || display->focused()};
-  unsigned int frames{0};
   uint64_t previous{display ? ticks() : 0};
   uint64_t pending{0};
   auto const open_alert{[&](int message){
@@ -485,8 +504,9 @@ auto main(int argc, char *argv[])->int try {
         options->draw(alert_frame);
       }
       display->present(alert_frame, scene->colours(), cursor_image());
-      ++frames;
-      if(frame_limit && frames >= frame_limit) running = false;
+#ifndef NDEBUG
+      if(frame_limit && ++frames >= frame_limit) running = false;
+#endif
       sleep_milliseconds(8);
     }
     if(running && !leave_mission) display->warp_mouse(saved_mouse[0], saved_mouse[1]);
@@ -535,7 +555,7 @@ auto main(int argc, char *argv[])->int try {
       if(sound) sound->clear();
       auto const demo{requested_demo.value_or(1 + static_cast<unsigned>(std::time(nullptr) % 4))};
       requested_demo.reset();
-      earthsiege::demo_playback playback{resources, demo, menu.settings(), save_directory, music_settings, bundled_data / "demo-clocks", lod_distance_multiplier};
+      earthsiege::demo_playback playback{resources, demo, menu.settings(), save_directory, music_settings, bundled_data / "demo-clocks", distances};
       std::cout << "Playing " << (resources.edition() == earthsiege::game_edition::expansion ? "expansion" : "original") << " demo " << demo << '\n';
       auto const demo_events{[&]{
         earthsiege::window_event event{};
@@ -594,8 +614,8 @@ auto main(int argc, char *argv[])->int try {
             if(ticks() < deadline) show_frame(*erased);
           }
         }
-        ++frames;
-        if(frame_limit && frames >= frame_limit) {
+#ifndef NDEBUG
+        if(frame_limit && ++frames >= frame_limit) {
           running = false;
           if(!screenshot.empty()) {
             frame.save(screenshot, playback.view().colours(), render_resolution());
@@ -603,6 +623,7 @@ auto main(int argc, char *argv[])->int try {
           }
           return false;
         }
+#endif
         // Compute the next page during the clean refresh. Its presentation
         // waits for the same deadline even if rendering finishes early.
         return !display || (erased && playback.packets_read() < playback.packet_count()) || wait_until(deadline);
@@ -620,7 +641,7 @@ auto main(int argc, char *argv[])->int try {
     }
     if(menu.ready_to_launch()) {
       inspect_demo.reset();
-      scene = std::make_unique<earthsiege::mission_view>(resources, menu.launch(), music_settings, lod_distance_multiplier);
+      scene = std::make_unique<earthsiege::mission_view>(resources, menu.launch(), music_settings, distances);
       scene->render_resolution(render_resolution());
       scene->configure_input(menu.settings(), menu.device_calibrations());
       scene->begin_startup();
@@ -693,7 +714,7 @@ auto main(int argc, char *argv[])->int try {
         if(sound) sound->queue(samples);
         pending -= 25;
       }
-      menu.draw(menu_frame, render_resolution(), lod_distance_multiplier);
+      menu.draw(menu_frame, render_resolution(), distances.lod);
     }
     if(alert) {
       alert_frame = scene ? scene->image() : menu_frame;
@@ -706,13 +727,16 @@ auto main(int argc, char *argv[])->int try {
     auto const &frame{(alert || options) ? alert_frame : scene ? scene->image() : menu_frame};
     auto const &colours{scene ? scene->colours() : menu.colours()};
     if(display) display->present(frame, colours, cursor_image());
-    ++frames;
-    if(frame_limit && frames >= frame_limit) running = false;
+#ifndef NDEBUG
+    if(frame_limit && ++frames >= frame_limit) running = false;
+#endif
     if(display) sleep_milliseconds(8);
   }
+#ifndef NDEBUG
   if(!screenshot.empty()) {
     ((alert || options) ? alert_frame : scene ? scene->image() : menu_frame).save(screenshot, scene ? scene->colours() : menu.colours(), render_resolution());
   }
+#endif
   return EXIT_SUCCESS;
 } catch(std::exception const &error) {
   std::cerr << "ERROR: " << error.what() << std::endl;
