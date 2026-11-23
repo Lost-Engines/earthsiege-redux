@@ -67,7 +67,7 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
     impact_colours{read_palette(resources.read("simvol0", "dpl/IMPACT1.DPL"))},
     lift_artwork{read_bitmaps(resources.read("simvol0", "dba/INTRO.DBA")).at(0)},
     environment{resources, session->scenery().environment()},
-    renderer{frame, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT"))},
+    renderer{world_target, session->scenery(), read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT"))},
     camera{session->make_camera(camera_mode::attached)},
     external_actor{session->player_id()} {
   // The shipped file is an external input policy, separate from PREFS.CFG.
@@ -874,21 +874,25 @@ void mission_view::draw() {
   // 59c8f skips the world while the lower panel is stable. The transition
   // still draws it, but idle lower-panel frames do not advance cloud wind.
   if(session->recording_paused() && !options_camera) {
-    scoped_framebuffer_clip clip{frame, &mask};
-    for(unsigned y{0}; y < screen_height; ++y) {
-      for(unsigned x{0}; x < screen_width; ++x) frame.pixel(x, y, world_frame.pixels()[y * screen_width + x]);
-    }
+    frame.restore_world(world_frame, mask);
   } else if(transitions.snapshot().view != 1 || transitions.snapshot().prepared) {
-    scoped_framebuffer_clip clip{frame, &mask};
+    world_target = frame.resampled(scene_size);
+    // The detailed image is composited through the authored window after
+    // rasterization. The reference rasterizer applies its spans per primitive.
+    bool const original{scene_size == render_size{}};
+    world_target.clip(&mask);
     // 25b68 passes the cockpit's authored layout offset to 26264. The
     // projection centre alone leaves uncovered sky in an off-centre side view.
     auto const background_offset{inside ? vec2<int32_t>{window.instrument_origin[0], window.instrument_origin[1]} : vec2<int32_t>{0, 0}};
-    environment.draw(frame, camera.position, camera.angles, view.projection, view.bounds, ui_random, colours, detail, background_offset, impact.snapshot().flash, !startup);
+    environment.draw(world_target, camera.position, camera.angles, view.projection, view.bounds, ui_random, colours, detail, background_offset, impact.snapshot().flash, !startup);
     if(!startup) display_device.changed(64, 16);
     auto const objects{session->visible_objects(!inside)};
     auto &effects{session->visual_effects()};
     auto const ground{session->ground_models()};
     renderer.draw_objects(camera.position, camera.angles, {}, false, objects, &effects.lights(), ground, view);
+    world_target.clip(nullptr);
+    if(original) frame = std::move(world_target);
+    else frame.attach(std::make_shared<framebuffer>(std::move(world_target)), scene_size.bounds(), &mask);
     if(!options_camera) {
       world_frame = frame;
       world_frame.clip(nullptr);

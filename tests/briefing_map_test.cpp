@@ -56,6 +56,27 @@ int main(int argc, char **argv) try {
         ++failures;
         std::cerr << "frame " << c << "/" << i << " differs\n";
       }
+      if(c == 0 && i == 0) {
+        earthsiege::render_size const size{640, 400};
+        framebuffer page;
+        page.clear(37);
+        map.draw(page, briefing_map::map_bounds, size);
+        auto const image{page.resampled(size)};
+        if(!page.has_detail() || image.pixels().front() != 37) f.fail("briefing scenery window");
+        auto const &pixels{image.pixels()};
+        bool fine_edge{false};
+        auto const bounds{briefing_map::map_bounds};
+        for(int y{bounds.top * 2}; y < bounds.bottom * 2 && !fine_edge; y += 2) {
+          for(int x{bounds.left * 2}; x < bounds.right * 2; x += 2) {
+            auto const index{y * size.width + x};
+            if(pixels[index] != pixels[index + size.width + 1]) {
+              fine_edge = true;
+              break;
+            }
+          }
+        }
+        if(!fine_edge) f.fail("briefing scenery has no detail inside a logical pixel");
+      }
     }
   }
   f.require_end();

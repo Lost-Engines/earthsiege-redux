@@ -46,6 +46,23 @@ int main(int argc, char **argv) try {
     }
   }
   f.require_end();
+  // An instrument can paint the same index as the low-resolution sample of
+  // the world. It must still cover every detailed pixel in its logical cell.
+  earthsiege::render_size const size{640, 400};
+  auto world{std::make_shared<framebuffer>(size)};
+  world->pixel(0, 0, 12);
+  world->pixel(2, 0, 13);
+  framebuffer page;
+  page.attach(world, size.bounds());
+  page.pixel(1, 0, 0);
+  auto composed{page.resampled(size)};
+  if(composed.pixels()[0] != 12 || composed.pixels()[2] != 0) f.fail("world detail and HUD coverage");
+  cockpit_surface pages;
+  pages.store(page, 320, 0);
+  framebuffer pan;
+  pages.sample(pan, 160, 0);
+  pages.copy_page(0, 320, {0, 0, 319, 199});
+  if(pan.resampled(size).pixels()[320] != 12) f.fail("retained pan lost its detailed image after a page copy");
   resource_store resources{argv[2]};
   mission_view scene{resources, 1};
   scene.draw();

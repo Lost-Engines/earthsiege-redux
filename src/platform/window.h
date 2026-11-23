@@ -3,7 +3,9 @@
 #include <array>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
+#include <vector>
 #include <GLFW/glfw3.h>
 #include "render/framebuffer.h"
 
@@ -45,19 +47,25 @@ class window {
   glfw_context context;
   std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> handle{nullptr, glfwDestroyWindow};
   unsigned int texture{0};
-  std::array<std::array<uint8_t, 4>, screen_width * screen_height> display{};
+  int max_texture_size{0};
+  render_size texture_size{0, 0};
+  std::optional<render_size> fixed_resolution;
+  mutable render_size last_drawable{};
+  framebuffer resolved;
+  std::vector<std::array<uint8_t, 4>> display;
   std::deque<window_event> events;
   static auto self(GLFWwindow *handle)->window &;
   auto logical_position(double x, double y) const->std::array<int, 2>;
 
 public:
-  explicit window(unsigned int scale = 0);
+  explicit window(unsigned int scale = 0, std::optional<render_size> resolution = {});
   ~window();
   window(window const &) = delete;
   auto operator=(window const &)->window & = delete;
   void draw(framebuffer const &frame, palette const &colours, software_cursor const *cursor = nullptr);
   void present(framebuffer const &frame, palette const &colours, software_cursor const *cursor = nullptr);
   auto pointer_position() const->std::array<int, 2>;
+  auto resolution() const->render_size;
   auto poll(window_event &event)->bool;
   void pump_events();
   void warp_mouse(int x, int y);

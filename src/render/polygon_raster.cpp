@@ -158,7 +158,8 @@ static void draw_region(framebuffer &target, std::span<vec2<int32_t> const> cons
 }
 
 void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> points, rectangle bounds, uint8_t colour, polygon_winding winding) {
-  auto const *mask{target.clip()};
+  if(target.size() != render_size{}) bounds = bounds.intersect(target.size().bounds());
+  auto const *mask{target.raster_clip()};
   if(!mask) {
     draw_region(target, points, bounds, colour, winding, nullptr);
     return;

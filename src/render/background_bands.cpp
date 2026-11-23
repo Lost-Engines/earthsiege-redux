@@ -159,11 +159,15 @@ void draw_background_bands(framebuffer &target, background_bands const &source, 
     if(primitive.kind == background_primitive_kind::rectangle) {
       auto const &first{primitive.points.at(0)};
       auto const &second{primitive.points.at(1)};
-      target.fill({std::max(first.x, bounds.left), std::max(first.y, bounds.top), std::min(second.x, bounds.right), std::min(second.y, bounds.bottom)}, colour);
+      target.fill(target.size().from_logical({std::max(first.x, bounds.left), std::max(first.y, bounds.top), std::min(second.x, bounds.right), std::min(second.y, bounds.bottom)}), colour);
     } else {
       auto points{primitive.points};
       if(primitive.kind == background_primitive_kind::sky_polygon) std::ranges::reverse(points);
-      draw_solid_polygon(target, points, bounds, colour, polygon_winding::preserve);
+      for(auto &p : points) {
+        p.x = render_size::edge(p.x, target.size().width, 320);
+        p.y = render_size::edge(p.y, target.size().height, 200);
+      }
+      draw_solid_polygon(target, points, target.size().from_logical(bounds), colour, polygon_winding::preserve);
     }
   }
 }

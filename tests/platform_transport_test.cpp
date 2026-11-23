@@ -13,7 +13,10 @@ void require(bool value, char const *message) {
 int main() try {
   using earthsiege::viewport;
   auto const area{viewport::fit(1920, 1080)};
-  require(area.width == 1600 && area.height == 1000 && area.x == 160 && area.y == 40, "integer square pixels");
+  require(area.width == 1728 && area.height == 1080 && area.x == 96 && area.y == 0, "8:5 artwork fills the available height");
+  auto const fixed{viewport::fit(960, 600, {1920, 1080})};
+  require(fixed.width == 864 && fixed.height == 540 && fixed.x == 48 && fixed.y == 30, "fixed widescreen canvas fits a resized window");
+  require(fixed.logical(48, 30, 960, 600, 960, 600) == std::array{0, 0}, "input uses both sets of borders");
   for(auto const size : {std::array{960, 540, 1920, 1080}, std::array{803, 601, 803, 601}, std::array{120, 100, 120, 100}}) {
     auto const view{viewport::fit(size[2], size[3])};
     for(auto const pixel : {std::array{0, 0}, std::array{319, 199}, std::array{160, 100}}) {

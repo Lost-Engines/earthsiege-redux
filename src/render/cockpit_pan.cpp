@@ -51,9 +51,22 @@ std::vector<vec2<int32_t>> cockpit_pan_path(int action, int view,
 }
 void cockpit_surface::restore(std::span<uint8_t const> source) {
   if(source.size() != pixels_.size()) throw std::invalid_argument{"cockpit surface size"};
+  detail.reset();
   std::ranges::copy(source, pixels_.begin());
 }
+void cockpit_surface::writable_detail() {
+  if(detail.use_count() > 1) detail = std::make_shared<framebuffer>(*detail);
+}
 void cockpit_surface::store(framebuffer const &frame, int x, int y) {
+  if(frame.has_detail() && (!detail || page_size != frame.detail_size())) {
+    page_size = frame.detail_size();
+    framebuffer original{{640, 400}, pixels_};
+    detail = std::make_shared<framebuffer>(original.resampled({page_size.width * 2, page_size.height * 2}));
+  }
+  if(detail) {
+    writable_detail();
+    frame.blit_to(*detail, page_size.from_logical({x, y, x + 319, y + 199}));
+  }
   for(int row{0}; row < 200; ++row) {
     for(int column{0}; column < 320; ++column) {
       if(x + column >= 0 && x + column < 640 && y + row >= 0 && y + row < 400) {
@@ -65,15 +78,22 @@ void cockpit_surface::store(framebuffer const &frame, int x, int y) {
 void cockpit_surface::sample(framebuffer &frame, int x, int y) const {
   if(x < 0 || y < 0 || x + 320 > 640 || y + 200 > 400) throw std::out_of_range{"cockpit scanout outside surface"};
   scoped_framebuffer_clip clip{frame, nullptr};
+  frame.clear();
   for(int row{0}; row < 200; ++row) {
     for(int column{0}; column < 320; ++column) {
       frame.pixel(column, row, pixels_[static_cast<size_t>((y + row) * 640 + x + column)]);
     }
   }
+  if(detail) frame.attach(detail, page_size.from_logical({x, y, x + 319, y + 199}));
 }
 
 void cockpit_surface::copy_page(int source_x, int target_x, rectangle bounds) {
   if(source_x % 4 || target_x % 4) throw std::invalid_argument{"unaligned VGA page origin"};
+  if(detail) {
+    writable_detail();
+    detail->copy_rows(render_size::edge(source_x, page_size.width, 320), render_size::edge(target_x, page_size.width, 320),
+                      page_size.from_logical(bounds));
+  }
   auto group{[&](int x, int y, unsigned mask){
     std::array<uint8_t, 4> latch{};
     auto const source{y * 640 + source_x + x};

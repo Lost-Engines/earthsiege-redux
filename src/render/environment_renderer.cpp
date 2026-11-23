@@ -23,8 +23,11 @@ void environment_renderer::draw(framebuffer &target, vec3<int32_t> const &positi
   draw_background_bands(target, bands, bounds);
   if(textured) texture.draw(target, position, angles, view, bands);
   if(detail.panorama) draw_panorama(target, horizon, place_panorama(horizon, bands, view, angles.z, environment.background.horizon_offset), bounds);
-  clouds.draw(target, position, angles, projection, bounds, detail.clouds, random);
-  marks.draw(target, position, angles, projection, bounds, detail.ground, random);
+  auto raster_projection{projection};
+  raster_projection.output = target.size();
+  auto const raster_bounds{target.size().from_logical(bounds)};
+  clouds.draw(target, position, angles, raster_projection, raster_bounds, detail.clouds, random);
+  marks.draw(target, position, angles, raster_projection, raster_bounds, detail.ground, random);
   reflection.update(colours, angles.x, reflection_enabled, impact);
 }
 }

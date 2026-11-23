@@ -178,7 +178,7 @@ public:
   std::vector<int16_t> take_audio() {
     return audio.take_output();
   }
-  void draw(framebuffer &target) const;
+  void draw(framebuffer &target, render_size canvas = {}) const;
   palette const &colours() const {
     return door_motion ? door_motion->colours() : cinematic ? cinematic->colours() : speech ? speech_palette : menu->current_palette();
   }

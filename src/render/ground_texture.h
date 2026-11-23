@@ -19,6 +19,7 @@ class ground_texture {
   bool expansion{false};
   unsigned texture_scale{8};
   void draw_expansion(framebuffer &, vec3<int32_t> const &, vec3<uint16_t> const &, background_view const &, background_bands const &);
+  void draw_scaled(framebuffer &, vec3<int32_t> const &, vec3<uint16_t> const &, background_view const &, background_bands const &) const;
   bitmap scratch;
   std::optional<panorama_placement> last;
 public:

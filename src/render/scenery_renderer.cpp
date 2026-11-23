@@ -107,7 +107,9 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
         for(auto const &face : ribbon->faces) {
           std::array<camera_vertex, 4> vertices;
           for(size_t point{0}; point != face.size(); ++point) vertices[point].position = world_point(ribbon->points[face[point]], view.camera);
-          auto const projected{project_polygon(vertices, view.projection, projection_source::model)};
+          auto projection{view.projection};
+          projection.output = target.size();
+          auto const projected{project_polygon(vertices, projection, projection_source::model)};
           std::vector<vec2<int32_t>> points;
           for(auto const &vertex : projected) points.push_back(vertex.position);
           // The beam's two-sided fill detects winding before viewport clipping,
@@ -121,7 +123,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
             }
             if(area < (int64_t{1} << 32) && (area < 0 || wrap_long(area) < 1)) std::ranges::reverse(points);
           }
-          draw_solid_polygon(target, points, view.bounds, ribbon->colour, polygon_winding::preserve);
+          draw_solid_polygon(target, points, target.size().from_logical(view.bounds), ribbon->colour, polygon_winding::preserve);
         }
         continue;
       }

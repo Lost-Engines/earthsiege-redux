@@ -4,12 +4,20 @@ Earthsiege uses GLFW for its window, keyboard, mouse and joystick input,
 and miniaudio for PCM output. The versions and build approach match Darker and
 TFX. SDL is no longer a dependency.
 
-The game still draws every original 320 x 200 pixel in software. OpenGL 2.1
-uploads that completed image to a nearest-filtered texture. It does not draw the
-models, choose visibility, shade surfaces or change the original renderer.
-The window uses square pixels, integer scaling where the display permits it,
-and black borders after resizing. One viewport transform handles framebuffer
-size, logical mouse positions and cursor warps, including HiDPI displays.
+Redux uses the GLFW framebuffer dimensions as its render resolution. A fixed
+`--resolution WIDTHxHEIGHT` sets the render target independently of the window.
+`--scale N` sets the initial window size in multiples of 320×200. Screenshots
+include the whole render canvas and its borders. With no window or fixed
+resolution, the target is 320×200.
+
+The software renderer projects world geometry into the pixels available inside
+the original 8:5 picture. The ground sampler uses the selected resolution and
+the mission's original texture and distance palette. Cockpit instruments, HUD
+symbols and menus use the authored 320×200 layout. A cockpit page keeps the
+detailed scene behind its window mask so that HUD writes, cursors and page
+pans all cover the correct pixels. OpenGL presents the result with nearest
+filtering. Mouse input and cursor warps use the same fitted rectangle as the
+screen, including on HiDPI displays.
 
 GLFW callbacks append to an ordered input queue. A mission modal can stop
 consuming that queue and resume it at the original simulation call site, so a
@@ -64,4 +72,6 @@ local-only, selected explicitly with `--run` or `--window`.
 The migration passed all 272 standard tests and the additional window check.
 A separate X11 keyboard check exercised music selection, saved preferences,
 Cancel and recovery from a missing SoundFont. The original-executable comparison
-suite continues to cover the unchanged gameplay, renderer and music scheduling.
+suite covers gameplay, the 320×200 renderer and music scheduling. The Redux
+window check also resizes the framebuffer and reads back two adjacent pixels
+from a high-resolution scene.

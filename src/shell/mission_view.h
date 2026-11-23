@@ -51,6 +51,8 @@ class mission_view {
   mission_audio audio;
   framebuffer frame;
   framebuffer world_frame;
+  framebuffer world_target;
+  render_size scene_size;
   cockpit_artwork cockpit;
   reactor_gauge reactor;
   throttle_gauge throttle;
@@ -252,6 +254,11 @@ public:
   void step_options_recorded();
   void end_options();
   void draw();
+  void render_resolution(render_size canvas) {
+    auto const size{canvas.artwork_size()};
+    if(size != scene_size) surface.reset_detail();
+    scene_size = size;
+  }
   void environment_detail(bool horizon, uint8_t cloud, uint8_t ground) {
     detail = {horizon, cloud, ground, true};
   }

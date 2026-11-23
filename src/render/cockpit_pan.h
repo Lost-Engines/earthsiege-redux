@@ -14,11 +14,15 @@ std::vector<vec2<int32_t>> cockpit_pan_path(int action, int view,
 class cockpit_surface {
   std::array<uint8_t, 640 * 400> pixels_;
   std::array<bool, 2> retained_edge{};
+  std::shared_ptr<framebuffer> detail;
+  render_size page_size;
+  void writable_detail();
 public:
   cockpit_surface() {
     pixels_.fill(63);
   }
   void restore(std::span<uint8_t const> source);
+  void reset_detail() { detail.reset(); }
   void store(framebuffer const &frame, int x, int y);
   void sample(framebuffer &frame, int x, int y) const;
   std::span<uint8_t const> pixels() const {

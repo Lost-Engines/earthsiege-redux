@@ -51,6 +51,9 @@ auto main(int const argc, char **argv)->int try {
   }
   file.require_end();
   if(cases != 3200) file.fail("incomplete projection fixture");
+  earthsiege::camera_projection enlarged{.output{640, 400}};
+  auto const fine{earthsiege::project_point({1, 512, 1}, enlarged, earthsiege::projection_source::model)};
+  if(fine != vec2<int32_t>{321, 199}) throw std::runtime_error{"lost subpixel geometry before output projection"};
   std::cout << cases << " native polygon projections and clipped texture/shade attributes agree" << std::endl;
   return EXIT_SUCCESS;
 } catch(std::exception const &error) {

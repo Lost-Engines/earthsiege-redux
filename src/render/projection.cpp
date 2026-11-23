@@ -1,4 +1,5 @@
 #include "projection.h"
+#include <cmath>
 #include <limits>
 #include <stdexcept>
 #include "simulation/fixed_math.h"
@@ -6,6 +7,10 @@
 namespace earthsiege {
 
 namespace {
+
+int32_t screen_coordinate(double logical, int pixels, int original) {
+  return static_cast<int32_t>(std::lround(std::clamp(logical * pixels / original, -1.e8, 1.e8)));
+}
 
 int32_t divide(int32_t const numerator, int32_t const denominator) {
   if(denominator == 0 || (numerator == std::numeric_limits<int32_t>::min() && denominator == -1)) throw std::domain_error{"projection division outside native range"};
@@ -31,6 +36,10 @@ vec2<int32_t> project_point(vec3<int32_t> const &point, camera_projection const 
   auto const denominator{view.perspective_shift ? point.y : view.orthographic_divisor};
   auto const horizontal{wrap_long(static_cast<int64_t>(point.x) * (int64_t{1} << shift))};
   auto const vertical{wrap_long(static_cast<int64_t>(point.z) * (int64_t{1} << shift))};
+  if(view.output != render_size{} && denominator) {
+    return {screen_coordinate(view.centre.x + double(horizontal) / denominator, view.output.width, 320),
+            screen_coordinate(view.centre.y - double(vertical) / denominator, view.output.height, 200)};
+  }
   auto const x{wrap_long(static_cast<int64_t>(view.centre.x) + divide(horizontal, denominator))};
   // Model perspective negates after division; the other paths negate before it.
   auto const y{view.perspective_shift && source == projection_source::model
@@ -55,8 +64,11 @@ std::vector<projected_vertex> project_polygon(std::span<camera_vertex const> con
       auto const z{interpolate(previous->position.z, current.position.z, numerator, denominator)};
       // Native intersections are already screen-scaled: near == 1 << shift is
       // assumed here, even if a caller supplies a nonstandard projection pair.
+      vec2<int32_t> position{wrap_long(static_cast<int64_t>(view.centre.x) + x), wrap_long(static_cast<int64_t>(view.centre.y) - z)};
+      if(view.output != render_size{}) position = {screen_coordinate(position.x, view.output.width, 320),
+                                                  screen_coordinate(position.y, view.output.height, 200)};
       result.push_back({
-        .position{wrap_long(static_cast<int64_t>(view.centre.x) + x), wrap_long(static_cast<int64_t>(view.centre.y) - z)},
+        .position{position.x, position.y},
         .texture{interpolate(previous->texture.x, current.texture.x, numerator, denominator), interpolate(previous->texture.y, current.texture.y, numerator, denominator)},
         .shade{static_cast<uint16_t>(interpolate(previous->shade, current.shade, numerator, denominator))},
       });

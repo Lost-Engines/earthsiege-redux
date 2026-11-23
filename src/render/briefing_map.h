@@ -76,7 +76,8 @@ public:
  void update(uint32_t timer);
  void navigate(uint16_t action);
  void restore_view();
- void hover(int x, int y, rectangle bounds = {15, 12, 283, 143});
- void draw(framebuffer&, rectangle bounds = {15, 12, 283, 143});
+ static constexpr rectangle map_bounds{15, 12, 283, 143};
+ void hover(int x, int y, rectangle bounds = map_bounds);
+ void draw(framebuffer&, rectangle bounds = map_bounds, render_size output = {});
 };
 }

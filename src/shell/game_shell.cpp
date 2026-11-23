@@ -1280,7 +1280,7 @@ void game_shell::draw_text(framebuffer &target, std::string const &value, rectan
   }
   if(!line.empty()) emit();
 }
-void game_shell::draw(framebuffer &target) const {
+void game_shell::draw(framebuffer &target, render_size canvas) const {
   if(door_motion) {
     door_motion->draw(target);
     return;
@@ -1340,7 +1340,7 @@ void game_shell::draw(framebuffer &target) const {
         draw_text(target, render_text(*program, game.prepared().counters), bounds, text_scroll);
       }
     }
-    if(kind == mission_text_kind::briefing && briefing) briefing->draw(target);
+    if(kind == mission_text_kind::briefing && briefing) briefing->draw(target, briefing_map::map_bounds, canvas.artwork_size());
   }
 }
 } // namespace earthsiege

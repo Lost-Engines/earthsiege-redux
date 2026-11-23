@@ -25,16 +25,17 @@ auto window::self(GLFWwindow *handle)->window & {
   return *static_cast<window *>(glfwGetWindowUserPointer(handle));
 }
 
-window::window(unsigned int scale) {
-  bool const automatic{scale == 0};
+window::window(unsigned int scale, std::optional<render_size> resolution) : fixed_resolution{resolution} {
+  bool const automatic{scale == 0 && !resolution};
   bool const compositor{automatic && glfwGetPlatform() == GLFW_PLATFORM_WAYLAND};
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
   glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
   glfwWindowHint(GLFW_MAXIMIZED, compositor ? GLFW_TRUE : GLFW_FALSE);
-  scale = std::clamp(scale ? scale : 2u, 1u, 16u);
-  handle.reset(glfwCreateWindow(static_cast<int>(320 * scale), static_cast<int>(200 * scale),
-    "Metaltech: Earthsiege C++ - Ctrl+Shift+M: music hardware", nullptr, nullptr));
+  int const magnification{static_cast<int>(std::clamp(scale ? scale : 2u, 1u, 16u))};
+  auto const initial{scale == 0 && resolution ? *resolution : render_size{320 * magnification, 200 * magnification}};
+  handle.reset(glfwCreateWindow(initial.width, initial.height,
+    "Metaltech: Earthsiege Redux - Ctrl+Shift+M: music hardware", nullptr, nullptr));
   if(!handle) throw std::runtime_error{"cannot create the Earthsiege window"};
   if(automatic && !compositor) {
     if(auto *monitor{glfwGetPrimaryMonitor()}) {
@@ -73,8 +74,7 @@ window::window(unsigned int scale) {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 320, 200, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  if(glGetError() != GL_NO_ERROR) throw std::runtime_error{"cannot allocate the display texture"};
+  glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
   glDisable(GL_DITHER);
   glEnable(GL_TEXTURE_2D);
   glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
@@ -146,27 +146,38 @@ window::~window() {
   glDeleteTextures(1, &texture);
 }
 void window::draw(framebuffer const &frame, palette const &colours, software_cursor const *cursor) {
+  int width{0}, height{0};
+  glfwGetFramebufferSize(handle.get(), &width, &height);
+  if(width <= 0 || height <= 0) return;
+  auto const canvas{resolution()};
+  auto const area{viewport::fit(width, height, canvas)};
   auto presented{frame};
   if(cursor && focused() && glfwGetWindowAttrib(handle.get(), GLFW_HOVERED)) {
     auto const p{pointer_position()};
     if(p[0] >= 0 && p[0] < 320 && p[1] >= 0 && p[1] < 200) cursor->draw(presented, p[0], p[1]);
   }
-  auto const &pixels{presented.pixels()};
-  for(size_t i{0}; i < pixels.size(); ++i) {
-    uint32_t const c{colours.colours[pixels[i]]};
-    display[i] = {static_cast<uint8_t>(c >> 16), static_cast<uint8_t>(c >> 8), static_cast<uint8_t>(c), 255};
+  auto const size{canvas.artwork_size()};
+  if(resolved.size() != size) resolved = framebuffer{size};
+  presented.blit_to(resolved, size.bounds());
+  std::array<std::array<uint8_t, 4>, 256> lookup;
+  for(size_t i{0}; i < lookup.size(); ++i) {
+    auto const rgb{colours.colours[i]};
+    lookup[i] = {static_cast<uint8_t>(rgb >> 16), static_cast<uint8_t>(rgb >> 8), static_cast<uint8_t>(rgb), 255};
   }
-  int width{0};
-  int height{0};
-  glfwGetFramebufferSize(handle.get(), &width, &height);
-  if(width <= 0 || height <= 0) return;
-  auto const area{viewport::fit(width, height)};
+  display.resize(size.count());
+  std::ranges::transform(resolved.pixels(), display.begin(), [&](uint8_t index){return lookup[index];});
   glViewport(0, 0, width, height);
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
   glViewport(area.x, height - area.y - area.height, area.width, area.height);
   glBindTexture(GL_TEXTURE_2D, texture);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 320, 200, GL_RGBA, GL_UNSIGNED_BYTE, display.data());
+  if(size != texture_size) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size.width, size.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, display.data());
+    if(glGetError() != GL_NO_ERROR) throw std::runtime_error{"cannot allocate the display texture"};
+    texture_size = size;
+  } else {
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size.width, size.height, GL_RGBA, GL_UNSIGNED_BYTE, display.data());
+  }
   glBegin(GL_TRIANGLE_STRIP);
   glTexCoord2f(0, 0);
   glVertex2f(-1, 1);
@@ -189,6 +200,17 @@ auto window::pointer_position() const->std::array<int, 2> {
   glfwGetCursorPos(handle.get(), &x, &y);
   return logical_position(x, y);
 }
+auto window::resolution() const->render_size {
+  if(!fixed_resolution) {
+    int w{0}, h{0};
+    glfwGetFramebufferSize(handle.get(), &w, &h);
+    if(w > 0 && h > 0) last_drawable = {w, h};
+  }
+  auto const canvas{fixed_resolution.value_or(last_drawable)};
+  auto const size{canvas.artwork_size()};
+  if(size.width > max_texture_size || size.height > max_texture_size) throw std::runtime_error{"render resolution exceeds the OpenGL texture limit"};
+  return canvas;
+}
 auto window::logical_position(double x, double y) const->std::array<int, 2> {
   int width{0};
   int height{0};
@@ -196,7 +218,7 @@ auto window::logical_position(double x, double y) const->std::array<int, 2> {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  return viewport::fit(bw, bh).logical(x, y, width, height, bw, bh);
+  return viewport::fit(bw, bh, resolution()).logical(x, y, width, height, bw, bh);
 }
 void window::warp_mouse(int x, int y) {
   int width{0};
@@ -205,7 +227,7 @@ void window::warp_mouse(int x, int y) {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  auto const p{viewport::fit(bw, bh).cursor(x, y, width, height, bw, bh)};
+  auto const p{viewport::fit(bw, bh, resolution()).cursor(x, y, width, height, bw, bh)};
   glfwSetCursorPos(handle.get(), p[0], p[1]);
 }
 void window::pump_events() {

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include "render/resolution.h"
 
 namespace earthsiege {
 
@@ -13,12 +14,15 @@ struct viewport {
   int width{1};
   int height{1};
 
-  static auto fit(int const width, int const height)->viewport {
-    double const available{std::min(width / 320.0, height / 200.0)};
-    double const scale{available >= 1 ? std::floor(available) : available};
-    int const w{std::max(1, static_cast<int>(320 * scale))};
-    int const h{std::max(1, static_cast<int>(200 * scale))};
-    return {(width - w) / 2, (height - h) / 2, w, h};
+  static auto fit(int width, int height, render_size canvas = {})->viewport {
+    render_size const drawable{std::max(1, width), std::max(1, height)};
+    auto const outer{drawable.fit(canvas)};
+    auto const inner{canvas.fit({})};
+    auto const x{render_size::edge(inner.left, outer.width(), canvas.width)};
+    auto const y{render_size::edge(inner.top, outer.height(), canvas.height)};
+    auto const right{render_size::edge(inner.right + 1, outer.width(), canvas.width)};
+    auto const bottom{render_size::edge(inner.bottom + 1, outer.height(), canvas.height)};
+    return {outer.left + x, outer.top + y, std::max(1, right - x), std::max(1, bottom - y)};
   }
 
   auto logical(double const px, double const py, int const window_width, int const window_height,

@@ -69,7 +69,7 @@ void draw_region_line(framebuffer &target, vec2<int32_t> first, vec2<int32_t> se
 } // anonymous namespace
 
 void draw_model_line(framebuffer &target, vec2<int32_t> first, vec2<int32_t> second, rectangle const bounds, uint8_t const colour, line_raster_mode const mode) {
-  if(auto const *mask{target.clip()}; mask && mode == line_raster_mode::clip_regions) {
+  if(auto const *mask{target.raster_clip()}; mask && mode == line_raster_mode::clip_regions) {
     for(auto const &region : mask->regions) draw_region_line(target, vec2<int32_t>{first}, vec2<int32_t>{second}, bounds, colour, region);
     return;
   }

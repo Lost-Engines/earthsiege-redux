@@ -56,6 +56,28 @@ int main() try {
   require(pixel == std::array<uint8_t, 3>{0xed, 0xcb, 0xa9}, "top-left presentation orientation and RGB channels");
   glReadPixels(500, 100, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel.data());
   require(pixel == std::array<uint8_t, 3>{0x12, 0x34, 0x56}, "bottom-right presentation pixels");
+  glfwSetWindowSize(handle, 803, 501);
+  int w{}, h{};
+  double const deadline{glfwGetTime() + 2};
+  do {
+    glfwWaitEventsTimeout(.01);
+    glfwGetWindowSize(handle, &w, &h);
+  } while((w != 803 || h != 501) && glfwGetTime() < deadline);
+  require(w == 803 && h == 501, "window resize delivered");
+  glfwGetFramebufferSize(handle, &w, &h);
+  require(display.resolution() == earthsiege::render_size{w, h}, "automatic resolution follows framebuffer pixels");
+  auto const size{display.resolution().artwork_size()};
+  auto const art{display.resolution().fit({})};
+  auto detail{std::make_shared<earthsiege::framebuffer>(size)};
+  detail->pixel(100, 100, 1);
+  frame.attach(detail, size.bounds());
+  // GLX can allocate the resized back buffer at the first swap.
+  display.present(frame, colours);
+  display.draw(frame, colours);
+  glReadPixels(art.left + 100, h - 1 - art.top - 100, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel.data());
+  require(pixel == std::array<uint8_t, 3>{0xed, 0xcb, 0xa9}, "individual rendered pixel after resize");
+  glReadPixels(art.left + 101, h - 1 - art.top - 100, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel.data());
+  require(pixel == std::array<uint8_t, 3>{0x12, 0x34, 0x56}, "adjacent output pixel remains independent");
   glfwSetWindowShouldClose(handle, GLFW_TRUE);
   while(display.poll(event) && event.type != earthsiege::event_type::close) {}
   require(event.type == earthsiege::event_type::close, "close survives nested dialog consumption");

@@ -1,5 +1,6 @@
 #include "ground_texture.h"
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <stdexcept>
@@ -44,6 +45,10 @@ ground_texture::ground_texture(world_environment const &env, bytes texture, byte
 void ground_texture::draw(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles,
                           background_view const &view, background_bands const &bands) {
   last.reset();
+  if(target.size() != render_size{}) {
+    draw_scaled(target, position, angles, view, bands);
+    return;
+  }
   if(expansion) {
     draw_expansion(target, position, angles, view, bands);
     return;
@@ -143,6 +148,45 @@ void ground_texture::draw(framebuffer &target, vec3<int32_t> const &position, ve
   }
   last = command;
   draw_panorama(target, std::span<bitmap const>{&scratch, 1}, std::span<panorama_placement const>{&*last, 1}, view.bounds);
+}
+
+void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles,
+                                 background_view const &view, background_bands const &bands) const {
+  auto const size{target.size()};
+  auto const area{size.from_logical(view.bounds)};
+  auto cos_angle{[](uint16_t a){ return model_cosine(a) / 16384.; }};
+  auto sin_angle{[&](uint16_t a){ return cos_angle(static_cast<uint16_t>(a - 16384)); }};
+  auto const cp{cos_angle(angles.x)}, sp{sin_angle(angles.x)};
+  auto const cr{cos_angle(angles.y)}, sr{sin_angle(angles.y)};
+  auto const cy{cos_angle(angles.z)}, sy{sin_angle(angles.z)};
+  double const focal{static_cast<double>(1u << view.projection_shift)};
+  double const texel{std::ldexp(1., -static_cast<int>(texture_scale))};
+  auto const horizon{bands.horizon[0]};
+  double const step{320. / size.width};
+  for(int y{std::max(0, area.top)}; y <= std::min(size.height - 1, area.bottom); ++y) {
+    double const ly{(y + .5) * 200. / size.height};
+    int const left{std::max(0, area.left)};
+    double lx{(left + .5) * step};
+    for(int x{left}; x <= std::min(size.width - 1, area.right); ++x, lx += step) {
+      auto const below{(lx - horizon.x) * sr + (ly - horizon.y) * cr};
+      if(below < 0) continue;
+      auto const dx{lx - view.centre.x}, dy{ly - view.centre.y};
+      auto const down{sr * dx + cr * dy + 1};
+      auto const ray_z{focal * sp - down * cp};
+      uint8_t colour{shades[14][0]};
+      if(ray_z < 0 && below >= fog_rows) {
+        auto const distance{-position.z * (focal * cp + down * sp) / ray_z};
+        auto const shade{std::upper_bound(thresholds.begin(), thresholds.begin() + 14, distance) - thresholds.begin()};
+        if(shade < 14) {
+          auto const lateral{(cr * dx - sr * dy) * (-position.z * sp + distance * cp) / focal};
+          auto const u{static_cast<int64_t>(std::floor((position.x + cy * lateral - sy * distance) * texel))};
+          auto const v{static_cast<int64_t>(std::floor((position.y + sy * lateral + cy * distance) * texel))};
+          colour = shades[shade][source[(v & 255) * 256 + (u & 255)] & 15];
+        }
+      }
+      target.pixel(x, y, colour);
+    }
+  }
 }
 
 void ground_texture::draw_expansion(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles, background_view const &view, background_bands const &bands) {

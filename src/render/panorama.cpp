@@ -1,6 +1,7 @@
 #include "panorama.h"
 #include <algorithm>
 #include <stdexcept>
+#include "render/bitmap_raster.h"
 #include "render/texture_raster.h"
 #include "simulation/fixed_math.h"
 #include "simulation/model_math.h"
@@ -64,6 +65,11 @@ void draw_panorama(framebuffer &target, std::span<bitmap const> images, std::spa
     int const width{static_cast<int>(image.width)};
     int const height{static_cast<int>(image.height)};
     if(!p.rotated) {
+      if(target.size() != render_size{}) {
+        auto const area{target.size().from_logical({p.position.x, p.position.y, p.position.x + width - 1, p.position.y + height - 1})};
+        draw_scaled_bitmap(target, image, {area.left, area.top}, {area.width(), area.height()}, target.size().from_logical(bounds));
+        continue;
+      }
       for(int y{std::max(bounds.top, p.position.y)}; y <= std::min(bounds.bottom, p.position.y + height - 1); ++y) {
         for(int x{std::max(bounds.left, p.position.x)}; x <= std::min(bounds.right, p.position.x + width - 1); ++x) {
           auto const colour{image.pixels.at(static_cast<size_t>((y - p.position.y) * width + x - p.position.x))};
@@ -83,8 +89,10 @@ void draw_panorama(framebuffer &target, std::span<bitmap const> images, std::spa
       vertices[i].position = {p.position.x + wrap_long((static_cast<int64_t>(v.x) * c - static_cast<int64_t>(v.y) * s + 8192) >> 14),
                          p.position.y + wrap_long((static_cast<int64_t>(v.x) * s + static_cast<int64_t>(v.y) * c + 8192) >> 14)};
       vertices[i].texture = {(i == 1 || i == 2) ? width - 1 : 0, i >= 2 ? height - 1 : 0};
+      vertices[i].position.x = render_size::edge(vertices[i].position.x, target.size().width, 320);
+      vertices[i].position.y = render_size::edge(vertices[i].position.y, target.size().height, 200);
     }
-    draw_textured_polygon(target, vertices, image, bounds, {}, target.clip() ? texture_scan_direction::rows : texture_scan_direction::columns);
+    draw_textured_polygon(target, vertices, image, target.size().from_logical(bounds), {}, target.clip() ? texture_scan_direction::rows : texture_scan_direction::columns);
   }
 }
 } // namespace earthsiege

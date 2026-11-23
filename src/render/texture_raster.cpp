@@ -45,6 +45,33 @@ std::vector<projected_vertex> clip_texture_top(std::span<projected_vertex const>
   return result;
 }
 
+// Clip in output pixels before entering the signed Q16 edge walkers. Near-plane
+// intersections can project far outside even a 4K viewport.
+std::vector<projected_vertex> clip_texture_window(std::span<projected_vertex const> vertices, rectangle bounds) {
+  std::vector<projected_vertex> points{vertices.begin(), vertices.end()};
+  for(unsigned side{0}; side < 4 && !points.empty(); ++side) {
+    auto const axis{side / 2};
+    int const limit{axis == 0 ? (side == 0 ? bounds.left : bounds.right) : (side == 2 ? bounds.top : bounds.bottom)};
+    auto inside{[&](projected_vertex const &p){return side % 2 ? p.position[axis] <= limit : p.position[axis] >= limit;}};
+    if(std::ranges::all_of(points, inside)) continue;
+    std::vector<projected_vertex> clipped;
+    auto const *previous{&points.back()};
+    for(auto const &p : points) {
+      if(inside(*previous) != inside(p)) {
+        int64_t const along{int64_t{limit} - previous->position[axis]};
+        int64_t const distance{int64_t{p.position[axis]} - previous->position[axis]};
+        auto mix{[&](int a, int b){return static_cast<int>(a + (int64_t{b} - a) * along / distance);}};
+        clipped.push_back({.position{mix(previous->position.x, p.position.x), mix(previous->position.y, p.position.y)},
+                           .texture{mix(previous->texture.x, p.texture.x), mix(previous->texture.y, p.texture.y)}});
+      }
+      if(inside(p)) clipped.push_back(p);
+      previous = &p;
+    }
+    points = std::move(clipped);
+  }
+  return points;
+}
+
 class texture_edge {
   std::span<projected_vertex const> vertices;
   size_t end;
@@ -125,11 +152,13 @@ public:
 
 } // anonymous namespace
 
-void draw_textured_polygon(framebuffer &target, std::span<projected_vertex const> const vertices, bitmap const &texture, rectangle const bounds, std::span<uint8_t const> const translation, texture_scan_direction const direction) {
+void draw_textured_polygon(framebuffer &target, std::span<projected_vertex const> const vertices, bitmap const &texture, rectangle bounds, std::span<uint8_t const> const translation, texture_scan_direction const direction) {
   /// Original affine mapper, switching scan direction for clipped cockpit views
+  bool const native{target.size() == render_size{}};
+  if(!native) bounds = bounds.intersect(target.size().bounds());
   if(vertices.size() < 3 || bounds.left > bounds.right || bounds.top > bounds.bottom) return;
   if(!translation.empty() && translation.size() != 256) throw std::invalid_argument{"texture translation must contain 256 colours"};
-  auto const clipped{clip_texture_top(vertices, bounds.top)};
+  auto const clipped{native ? clip_texture_top(vertices, bounds.top) : clip_texture_window(vertices, bounds)};
   if(clipped.size() < 3) return;
   unsigned int const axis{direction == texture_scan_direction::rows ? 1U : 0U};
   int32_t const primary_first{axis ? bounds.top : bounds.left};

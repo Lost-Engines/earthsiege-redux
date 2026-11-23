@@ -10,6 +10,17 @@ void draw_scaled_bitmap(framebuffer &target, bitmap const &source, vec2<int32_t>
   int32_t const right{std::min(bounds.right, position.x + size.x - 1)};
   int32_t const bottom{std::min(bounds.bottom, position.y + size.y - 1)};
   if(left > right || top > bottom) return;
+  if(target.size() != render_size{}) {
+    for(int y{top}; y <= bottom; ++y) {
+      auto const row{static_cast<int64_t>(y - position.y) * source.height / size.y};
+      for(int x{left}; x <= right; ++x) {
+        auto const col{static_cast<int64_t>(x - position.x) * source.width / size.x};
+        auto const colour{source.pixels[row * source.width + col]};
+        if(colour) target.pixel(x, y, colour);
+      }
+    }
+    return;
+  }
   int32_t const x_step{static_cast<int32_t>((static_cast<int64_t>(source.width) << 16) / size.x) + 1};
   int32_t const y_step{static_cast<int32_t>((static_cast<int64_t>(source.height) << 16) / size.y) + 1};
   int64_t const skipped{top - position.y};

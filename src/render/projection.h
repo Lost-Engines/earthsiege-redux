@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <span>
 #include <vector>
+#include "render/resolution.h"
 #include "vectorstorm/vector/vector2.h"
 #include "vectorstorm/vector/vector3.h"
 
@@ -12,6 +13,7 @@ struct camera_projection {
   int32_t near_distance{256};
   int32_t orthographic_divisor{256};
   vec2<int32_t> centre{160, 100};
+  render_size output{};
 };
 
 enum class projection_source {

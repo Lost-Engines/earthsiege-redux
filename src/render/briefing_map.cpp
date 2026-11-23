@@ -516,7 +516,7 @@ void briefing_map::hover(int x, int y, rectangle bounds) {
   }
   // Original selection remains latched after the pointer leaves its hotspot.
 }
-void briefing_map::draw(framebuffer &target, rectangle bounds) {
+void briefing_map::draw(framebuffer &target, rectangle bounds, render_size output) {
   screen_mask mask;
   for(int y{std::max(0, bounds.top)}; y <= std::min(199, bounds.bottom); ++y) mask.rows[static_cast<size_t>(y)].push_back({bounds.left, bounds.right});
   mask.regions.push_back({bounds.top, std::vector<scanline_span>(static_cast<size_t>(bounds.bottom - bounds.top + 1), {bounds.left, bounds.right}), true});
@@ -536,16 +536,20 @@ void briefing_map::draw(framebuffer &target, rectangle bounds) {
   view.projection.perspective_shift = 7;
   view.projection.near_distance = 128;
   view.projection.centre = {bounds.left + ((bounds.right - bounds.left + 1) >> 1), bounds.top + ((bounds.bottom - bounds.top + 1) >> 1)};
-  model_renderer models{target, colours};
+  std::shared_ptr<framebuffer> scenery_frame;
+  if(output != render_size{}) scenery_frame = std::make_shared<framebuffer>(target.resampled(output));
+  auto &world{scenery_frame ? *scenery_frame : target};
+  model_renderer models{world, colours};
   std::array const lights{default_world_light()};
   {
-    scoped_framebuffer_clip scenery_clip{target, nullptr};
+    scoped_framebuffer_clip scenery_clip{world, nullptr};
     for(auto const &object : scenery) {
       auto instance{object.model};
       if(!instance.cell_frames().empty()) instance.cell_frames().front() = 1;
       models.draw(terrain.roots.at(object.shape), instance, object.placement, view, textures, lights);
     }
   }
+  if(scenery_frame) target.attach(std::move(scenery_frame), output.bounds(), &mask);
   if(revealing && reveal_elapsed < 20) return;
   auto const grid{grid_lines(eye, bounds)};
   size_t const shown_lines{revealing ? std::min(grid.size(), static_cast<size_t>(reveal_elapsed - 20 + 1)) : grid.size()};

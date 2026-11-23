@@ -220,10 +220,13 @@ class model_draw {
       return wrap_long((product + rounding) >> 8);
     }};
     auto position{project_point(point, view.projection, projection_source::model)};
-    position.x -= scaled(source.offset.x);
-    position.y -= scaled(source.offset.y);
     vec2<int32_t> const size{scaled(static_cast<int32_t>(texture.width)), scaled(static_cast<int32_t>(texture.height))};
-    if(size.x < 200 && size.y < 200) draw_scaled_bitmap(target, texture, vec2<int32_t>{position}, vec2<int32_t>{size}, view.bounds);
+    if(size.x >= 200 || size.y >= 200) return;
+    auto const output{view.projection.output};
+    position.x -= render_size::edge(scaled(source.offset.x), output.width, 320);
+    position.y -= render_size::edge(scaled(source.offset.y), output.height, 200);
+    draw_scaled_bitmap(target, texture, vec2<int32_t>{position},
+                       {render_size::edge(size.x, output.width, 320), render_size::edge(size.y, output.height, 200)}, view.bounds);
   }
 
 public:
@@ -310,8 +313,11 @@ model_renderer::model_renderer(framebuffer &buffer, palette const &palette_data)
 
 void model_renderer::draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> const textures, std::span<light const> const lights, std::span<model_attachment const> const attachments) {
   if(view.cull_bounds && !classify_model_bounds(source.header, compose_transforms(object, view.camera), view.projection, view.bounds, false)) return;
+  auto raster_view{view};
+  raster_view.projection.output = target.size();
+  raster_view.bounds = target.size().from_logical(view.bounds);
   model_light_cache cache{lights, object, instance.transforms().size()};
-  model_draw{target, colours, texture_shades, instance, object, view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);
+  model_draw{target, colours, texture_shades, instance, object, raster_view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);
 }
 
 } // namespace earthsiege
