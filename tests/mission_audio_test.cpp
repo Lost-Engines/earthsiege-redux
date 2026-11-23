@@ -39,7 +39,7 @@ int main(int argc, char **argv) try {
   auto const names{read_resource_names(resources.read("simvol0", "nam/MECHS.NAM"))};
   for(unsigned int demo{1}; demo <= 4; ++demo) {
     auto const tape{read_input_tape(read_file(resources.root() / "TAPES" / ("DEMO" + std::to_string(demo) + ".TAP")))};
-    mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
+    mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)]), random_state{0}};
     auto const cockpit{read_cockpit(resources, names.at(static_cast<size_t>(session.player_chassis())))};
     random_state random{17};
     cockpit_radio radio{resources, cockpit.layout, session, random};
@@ -67,7 +67,7 @@ int main(int argc, char **argv) try {
   if(!speech_samples) throw std::runtime_error{"silent radio"};
   // Live encounter decisions drive real song loading, FM and shared PCM voices.
   mission_audio soundtrack{resources};
-  random_state rng;
+  random_state rng{0};
   music_contacts encounters;
   bool heard{false};
   bool percussion{false};

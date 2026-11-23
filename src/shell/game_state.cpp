@@ -2,9 +2,9 @@
 #include <algorithm>
 #include <stdexcept>
 namespace earthsiege {
-game_state::game_state(resource_store const &data, int seed)
+game_state::game_state(resource_store const &data, std::optional<int16_t> dos_seed)
   : resources{data},
-    random{static_cast<int16_t>(seed)} {}
+    random{dos_seed ? random_state{*dos_seed} : random_state{}} {}
 career_state &game_state::crew() {
   return campaign_ ? career_->career.states[0] : single_.state;
 }
@@ -117,10 +117,10 @@ void game_state::checkpoint(size_t history) {
 void game_state::update_roster() {
   player_ = launch_player_roster(crew(), roster(), campaign_, identity_, random);
 }
-std::unique_ptr<mission_session> game_state::launch() {
+std::unique_ptr<mission_session> game_state::launch(fragment_settings fragments) {
   if(!prepared_) throw std::runtime_error{"mission has not been prepared"};
   update_roster();
-  auto result{std::make_unique<mission_session>(resources, prepared_->compiled.script, player_, random_state{}, prepared_->counters)};
+  auto result{std::make_unique<mission_session>(resources, prepared_->compiled.script, player_, random.fresh_stream(), prepared_->counters, fragments)};
   if(auto section{text_.find(mission_text_kind::objectives)}) {
     if(auto lines{std::get_if<std::vector<earthsiege::objective_text>>(&section->content)}) {
       for(auto const &line : *lines) result->objective_text.push_back(line.text);
@@ -140,7 +140,7 @@ void game_state::restore_history(size_t history) {
   prepared_.reset();
 }
 void game_state::resume_shell(int16_t seed, std::optional<campaign_start> saved) {
-  random = random_state{seed};
+  if(random.replaying()) random = random_state{seed};
   if(campaign_) {
     if(!saved) throw std::runtime_error{"campaign return needs the launch save"};
     career_ = std::move(*saved);

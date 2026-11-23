@@ -117,7 +117,7 @@ class game_shell {
   void begin();
   void draw_text(framebuffer &frame, std::string const &text, rectangle const &bounds, int scroll = 0) const;
 public:
-  game_shell(resource_store const &resources, std::filesystem::path save_directory, int seed = 17, music_settings const &music = {});
+  game_shell(resource_store const &resources, std::filesystem::path save_directory, std::optional<int16_t> dos_seed = {}, music_settings const &music = {});
   void configure_music(music_settings const &settings) {
     audio.configure_music(settings);
   }
@@ -140,6 +140,7 @@ public:
     demo_requested = true;
   }
   bool take_demo_request();
+  unsigned int choose_demo() { return 1u + static_cast<unsigned int>(game.presentation_random().bounded(4)); }
   void demo_return();
   preferences const &settings() const {
     return preferences_;
@@ -172,7 +173,7 @@ public:
   std::unique_ptr<mission_options_dialog> flight_options() {
     return std::make_unique<mission_options_dialog>(resources, preferences_, saves, calibrations);
   }
-  std::unique_ptr<mission_session> launch();
+  std::unique_ptr<mission_session> launch(fragment_settings fragments = {});
   void mission_return(mission_results const &result, mission_counters const &counters, int16_t return_seed = 17);
   void advance(unsigned timer_ticks = 3);
   std::vector<int16_t> take_audio() {

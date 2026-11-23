@@ -30,7 +30,7 @@ int main(int argc, char **argv) try {
     auto const script{read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)])};
     auto const roster{read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
     auto const counters{read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)])};
-    mission_session session{resources, script, roster, random_state{}, counters};
+    mission_session session{resources, script, roster, random_state{0}, counters};
     if(session.activity_state().size() != total || session.target_marker()) file.fail("initial HUD state");
     for(unsigned int actor{0}; actor < total; ++actor) {
       vec3<int32_t> const position{file.integer<int32_t>(), file.integer<int32_t>(), file.integer<int32_t>()};

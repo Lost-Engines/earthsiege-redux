@@ -29,7 +29,7 @@ int main(int argc, char **argv) try {
   auto magic{file.take(8)};
   if(std::string(magic.begin(), magic.end()) != "ESWERAS1") file.fail("fixture version");
   auto tape{read_input_tape(read_file(resources.root() / "TAPES/DEMO1.TAP"))};
-  mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
+  mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)]), random_state{0}};
   auto const layout{read_cockpit_layout(resources.read("simvol0", "gau/HERCULES.GAU"))};
   auto const bounds{layout.bounds(0x694)};
   auto count{file.integer<uint32_t>()};

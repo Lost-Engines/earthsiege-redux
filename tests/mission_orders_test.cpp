@@ -33,7 +33,7 @@ int main(int argc, char **argv) try {
     auto const actors{read()};
     auto const steps{read()};
     auto const tape{read_input_tape(read_file(resources.root() / "TAPES" / ("DEMO" + std::to_string(demo) + ".TAP")))};
-    mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)]), random_state{}, read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)])};
+    mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)]), random_state{0}, read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)])};
     for(int step{0}; step < steps; ++step) {
       auto const command{static_cast<uint16_t>(read())};
       session.set_displayed_target(ref());

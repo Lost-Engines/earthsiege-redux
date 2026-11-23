@@ -28,7 +28,7 @@ live_smoke_puff::live_smoke_puff(smoke_puff_state value, shape_part const &shape
   : state{std::move(value)},
     model{shape} {}
 
-world_effects::world_effects(resource_store const &resources, sound_sink sink, bool alternate_ground_models)
+world_effects::world_effects(resource_store const &resources, sound_sink sink, bool alternate_ground_models, fragment_settings fragments)
   : sounds{std::move(sink)},
     explosion_definitions{read_explosions(resources.read("simvol0", "dat/EXPLOS.DAT"))},
     debris_definitions{read_debris(resources.read("simvol0", "dat/DEBRIS.DAT"))},
@@ -38,7 +38,9 @@ world_effects::world_effects(resource_store const &resources, sound_sink sink, b
     smoke_models{read_model(resources.read("simvol0", "dts/SMOKE.DTS"))},
     detached_weapon_models{read_model(resources.read("simvol0", "dts/MECHWPN2.DTS"))},
     smoke_textures{read_bitmaps(resources.read("simvol0", "dba/SMOKE.DBA"))},
-    weapon_textures{read_bitmaps(resources.read("simvol0", "dba/WPNTEX.DBA"))} {
+    weapon_textures{read_bitmaps(resources.read("simvol0", "dba/WPNTEX.DBA"))},
+    fragment_count_multiplier{fragments.count_multiplier},
+    debris{fragments.pool_size} {
   if(resources.edition() == game_edition::expansion) {
     deployment_models = read_model(resources.read("simvol0", "dts/METEOR.DTS"));
     deployment_textures = read_bitmaps(resources.read("simvol0", "dba/IMPACT.DBA"));
@@ -72,10 +74,9 @@ std::optional<size_t> world_effects::add_explosion(int16_t const selected, vec3<
 }
 
 void world_effects::add_debris(int16_t const group, vec3<int32_t> const &position, random_state &random) {
-  for(auto &particle : create_debris_burst(debris_definitions.at(static_cast<size_t>(group)), position, random)) {
+  auto const &definition{debris_definitions.at(static_cast<size_t>(group))};
+  for(auto &particle : create_debris_burst(definition, position, random, fragment_count_multiplier, debris.available())) {
     auto const &shape{std::get<shape_part>(debris_models.roots.at(static_cast<size_t>(particle.model)).content)};
-    // The original burst dereferences null after pool exhaustion. Retain its
-    // bounded capacity and random draws, dropping excess visuals safely.
     debris.emplace(std::move(particle), shape);
   }
 }

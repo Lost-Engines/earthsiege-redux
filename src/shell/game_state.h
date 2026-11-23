@@ -34,7 +34,7 @@ class game_state {
   int16_t last_kind_{0};
   void prepare(std::string name, mission_options const &options);
 public:
-  explicit game_state(resource_store const &resources, int seed = 17);
+  explicit game_state(resource_store const &resources, std::optional<int16_t> dos_seed = {});
   return_presentation const &returned() const {
     return returned_;
   }
@@ -84,8 +84,8 @@ public:
   void restore_history(size_t history);
   void update_roster();
   void checkpoint(size_t history = 0);
-  std::unique_ptr<mission_session> launch();
-  /// GO is a fresh process after flight: restore its saved career and RNG.
+  std::unique_ptr<mission_session> launch(fragment_settings fragments = {});
+  /// Restore the launch save. DOS comparison runs also restart GO's generator.
   void resume_shell(int16_t seed, std::optional<campaign_start> saved = {});
   void complete(mission_results const &results, mission_counters const &counters, std::function<void()> const &before_repair = {});
 };

@@ -33,7 +33,7 @@ int main(int const argc, char **argv) try {
     auto const tape{read_input_tape(read_file(resources.root() / "TAPES" / (demo + ".TAP")))};
     auto const script{read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)])};
     auto const roster{read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
-    mission_session session{resources, script, roster};
+    mission_session session{resources, script, roster, earthsiege::random_state{0}};
     auto const actors{session.flying_actors()};
     auto const expected{file.integer<uint16_t>()};
     if(actors.size() != expected) file.fail(demo + " flyer count");

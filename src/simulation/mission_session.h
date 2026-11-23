@@ -246,7 +246,7 @@ class mission_session {
   std::vector<scene_model> herc_models(bool roster_only, bool include_player = true);
 
 public:
-  mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random = random_state{}, mission_counters initial_counters = {});
+  mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random = {}, mission_counters initial_counters = {}, fragment_settings fragments = {});
   mission_session(mission_session const&) = delete;
   mission_session(mission_session&&) = delete;
   mission_session &operator=(mission_session const&) = delete;

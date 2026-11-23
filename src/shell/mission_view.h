@@ -158,8 +158,8 @@ class mission_view {
   std::deque<uint16_t> commands;
 
 public:
-  mission_view(resource_store const &resources, unsigned int demo, music_settings const &music = {}, view_distances distances = {});
-  mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music = {}, view_distances distances = {});
+  mission_view(resource_store const &resources, unsigned int demo, music_settings const &music = {}, view_distances distances = {}, fragment_settings fragments = {});
+  mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music = {}, view_distances distances = {}, fragment_settings fragments = {});
   mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music = {}, view_distances distances = {});
   void configure_music(music_settings const &settings) {
     audio.configure_music(settings);

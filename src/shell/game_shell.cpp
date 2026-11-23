@@ -22,14 +22,14 @@ unsigned region(unsigned screen) {
   return 1000;
 }
 } // anonymous namespace
-game_shell::game_shell(resource_store const &r, std::filesystem::path root, int seed, music_settings const &music)
+game_shell::game_shell(resource_store const &r, std::filesystem::path root, std::optional<int16_t> dos_seed, music_settings const &music)
  : resources{r},
    saves{std::move(root), r.edition()},
    careers{saves.index()},
    preferences_{saves.load_preferences()},
    calibrations{load_host_calibrations(saves)},
    audio{r, music},
-   game{r, seed},
+   game{r, dos_seed},
  strings{r.read("shell0", "eng/watext.bin"), r.edition()},
    text_face{read_font(r.read("shell0", "dfn/nm_green.dfn"))},
    prices{read_service_prices(r.read("shell0", "cfg/damage.dat"))},
@@ -593,7 +593,7 @@ void game_shell::demo_return() {
   audio.resume();
   show(1000);
 }
-std::unique_ptr<mission_session> game_shell::launch() {
+std::unique_ptr<mission_session> game_shell::launch(fragment_settings fragments) {
   if(!launch_requested) throw std::runtime_error{"no requested launch"};
   if(resources.edition() == game_edition::expansion) {
     preferences_.set(17, static_cast<uint8_t>(battle_set));
@@ -602,7 +602,7 @@ std::unique_ptr<mission_session> game_shell::launch() {
   }
   launch_requested = false;
   audio.suspend();
-  auto result{game.launch()};
+  auto result{game.launch(fragments)};
   save_career();
   return result;
 }

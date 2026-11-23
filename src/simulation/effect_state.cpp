@@ -1,6 +1,8 @@
 #include "effect_state.h"
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
+#include <utility>
 #include "resources/combat.h"
 #include "simulation/fixed_math.h"
 #include "simulation/model_math.h"
@@ -95,12 +97,13 @@ bool advance_debris(debris_particle &state) {
   return state.velocity.z < minimum_bounce;
 }
 
-std::vector<debris_particle> create_debris_burst(debris_definition const &definition, vec3<int32_t> const &position, random_state &random) {
+std::vector<debris_particle> create_debris_burst(debris_definition const &definition, vec3<int32_t> const &position, random_state &rolls,
+                                                 double count_multiplier, size_t available) {
   if(definition.count_limit <= 0 || definition.total_weight <= 0 || definition.models.empty()) throw std::invalid_argument{"invalid debris choice range"};
-  auto const count{random.bounded(definition.count_limit)};
-  std::vector<debris_particle> particles;
-  particles.reserve(static_cast<size_t>(count));
-  for(int i{0}; i != count; ++i) {
+  if(!std::isfinite(count_multiplier) || count_multiplier < 0) throw std::invalid_argument{"invalid fragment count multiplier"};
+  auto const authored_max{static_cast<uint32_t>(definition.count_limit - 1)};
+  auto const maximum{static_cast<uint32_t>(std::min(authored_max * count_multiplier, static_cast<double>(UINT32_MAX)))};
+  auto const particle{[&](random_state &random)->debris_particle {
     auto choice{random.bounded(definition.total_weight)};
     size_t index{0};
     // Equality stays in the preceding bucket in the original weighted selector.
@@ -119,7 +122,28 @@ std::vector<debris_particle> create_debris_burst(debris_definition const &defini
       wrap_word((horizontal * model_cosine(heading) + matrix_rounding) >> matrix_fraction_bits),
       wrap_word((launch_speed * model_cosine(static_cast<uint16_t>(elevation - angle_quarter_turn)) + matrix_rounding) >> matrix_fraction_bits),
     };
-    particles.push_back({definition.models[index].model, vec3<int32_t>{position}, {0, 0, heading}, vec3<int16_t>{velocity}});
+    return {definition.models[index].model, vec3<int32_t>{position}, {0, 0, heading}, vec3<int16_t>{velocity}};
+  }};
+  std::vector<debris_particle> particles;
+  auto const scaled_burst{[&](random_state &random) {
+    size_t const count{available && maximum ? std::min<size_t>(random.inclusive(maximum), available) : 0};
+    if(count < particles.size()) particles.resize(count);
+    particles.reserve(count);
+    while(particles.size() < count) particles.push_back(particle(random));
+  }};
+  if(rolls.replaying()) {
+    // A TAP records controls. Its next combat roll follows the authored burst.
+    auto const count{rolls.bounded(definition.count_limit)};
+    for(int i{0}; i < count; ++i) {
+      auto piece{particle(rolls)};
+      if(particles.size() < available) particles.push_back(std::move(piece));
+    }
+    if(maximum != authored_max) {
+      auto visuals{rolls};
+      scaled_burst(visuals);
+    }
+  } else {
+    scaled_burst(rolls);
   }
   return particles;
 }

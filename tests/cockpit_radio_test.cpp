@@ -27,7 +27,7 @@ int main(int argc, char **argv) try {
     for(bool const shown : {true, false}) {
       for(bool captions : {true, false}) {
         auto const tape{read_input_tape(read_file(resources.root() / "TAPES" / ("DEMO" + std::to_string(demo) + ".TAP")))};
-        mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
+        mission_session session{resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)]), random_state{0}};
         auto const cockpit{read_cockpit(resources, names.at(static_cast<size_t>(session.player_chassis())))};
         random_state random{17};
         cockpit_radio radio{resources, cockpit.layout, session, random};

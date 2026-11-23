@@ -1,4 +1,5 @@
 #pragma once
+#include <deque>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -17,19 +18,15 @@ template<typename T> class object_pool {
     size_t previous{end};
     bool retiring{false};
   };
-  std::vector<slot> slots;
+  std::deque<slot> slots;
   std::vector<size_t> pending;
   size_t free_head{end};
   size_t active_head{end};
-  size_t free_count{0};
+  size_t const capacity;
+  size_t free_count;
 
 public:
-  explicit object_pool(size_t const capacity)
-    : slots(capacity),
-      free_head{capacity == 0 ? end : 0},
-      free_count{capacity} {
-    for(size_t i{0}; i < capacity; ++i) slots[i].next = i + 1 < capacity ? i + 1 : end;
-  }
+  explicit object_pool(size_t limit) : capacity{limit}, free_count{limit} {}
   object_pool(object_pool const &) = delete;
   object_pool &operator=(object_pool const &) = delete;
   object_pool(object_pool &&) = delete;
@@ -38,10 +35,11 @@ public:
     return free_count;
   }
   std::optional<size_t> next_free_slot() const {
-    return free_head == end ? std::nullopt : std::optional<size_t>{free_head};
+    if(!free_count) return std::nullopt;
+    return free_head == end ? slots.size() : free_head;
   }
   size_t size() const {
-    return slots.size() - free_count;
+    return capacity - free_count;
   }
   T &at(size_t const index) {
     return slots.at(index).value.value();
@@ -54,7 +52,11 @@ public:
   }
 
   template<typename... Args> std::optional<size_t> emplace(Args &&...args) {
-    if(free_head == end) return std::nullopt;
+    if(!free_count) return std::nullopt;
+    if(free_head == end) {
+      slots.emplace_back();
+      free_head = slots.size() - 1;
+    }
     auto const index{free_head};
     auto &entry{slots[index]};
     entry.value.emplace(std::forward<Args>(args)...);

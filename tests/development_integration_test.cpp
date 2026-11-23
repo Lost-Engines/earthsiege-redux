@@ -38,7 +38,7 @@ int main(int argc, char **argv) try {
   resource_store resources{argv[1]};
   bool const expansion{resources.edition() == game_edition::expansion};
   auto tape{read_input_tape(read_file(resources.root() / "TAPES/DEMO1.TAP"), resources.edition())};
-  auto owner{std::make_unique<mission_session>(resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)], tape.edition), random_state{}, read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)]))};
+  auto owner{std::make_unique<mission_session>(resources, read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)]), read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)], tape.edition), random_state{0}, read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)]))};
   auto &s{*owner};
   mission_view view{resources, std::move(owner)};
   s.playback(false);

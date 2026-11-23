@@ -16,7 +16,7 @@
 
 namespace earthsiege {
 
-mission_session::mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random, mission_counters initial_counters)
+mission_session::mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random, mission_counters initial_counters, fragment_settings fragments)
   : settings{script.header},
     layout{resources},
     routes{script.routes},
@@ -27,7 +27,8 @@ mission_session::mission_session(resource_store const &resources, mission_script
     weapon_models{read_model(resources.read("simvol0", "dts/MECHWPNS.DTS"))},
     weapon_textures{read_bitmaps(resources.read("simvol0", "dba/WPNTEX.DBA"))},
     random{std::move(initial_random)},
-    effects{resources, [this](auto const &event){emit_sound(event);}, terrain.environment().atmosphere_parameters[1] != 0},
+    visual_random{random.fresh_stream()},
+    effects{resources, [this](auto const &event){emit_sound(event);}, terrain.environment().atmosphere_parameters[1] != 0, fragments},
     projectiles{resources, weapon_definitions, [this](auto const &event){emit_sound(event);}} {
   auto const placements{layout.place(script, roster, true)};
   activity = std::make_unique<mission_activity>(script, placements, initial_counters, false, resources.edition() == game_edition::expansion);

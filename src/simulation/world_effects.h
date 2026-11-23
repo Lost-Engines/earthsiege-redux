@@ -12,7 +12,10 @@ namespace earthsiege {
 
 class resource_store;
 inline size_t constexpr explosion_capacity{40};
-inline size_t constexpr debris_capacity{150};
+struct fragment_settings {
+  uint32_t pool_size{150};
+  double count_multiplier{1.0};
+};
 inline size_t constexpr smoke_puff_capacity{200};
 inline size_t constexpr smoke_emitter_capacity{20};
 inline size_t constexpr effect_light_capacity{3};                              // controller pool, distinct from the lighting manager's twenty sources
@@ -79,13 +82,14 @@ class world_effects {
   effect_lighting lighting{std::array{default_world_light()}, 2000, 10};
   object_pool<size_t> light_owners{effect_light_capacity};
   object_pool<live_explosion> explosions{explosion_capacity};
-  object_pool<live_debris> debris{debris_capacity};
+  double fragment_count_multiplier;
+  object_pool<live_debris> debris;
   object_pool<live_smoke_puff> puffs{smoke_puff_capacity};
   object_pool<live_smoke_emitter> emitters{smoke_emitter_capacity};
   std::array<vec3<int16_t>, smoke_puff_capacity> retained_puff_velocities{};
 
 public:
-  explicit world_effects(resource_store const &resources, sound_sink sounds = {}, bool alternate_ground_models = false);
+  explicit world_effects(resource_store const &resources, sound_sink sounds = {}, bool alternate_ground_models = false, fragment_settings fragments = {});
   std::optional<size_t> add_explosion(int16_t definition, vec3<int32_t> const &position, random_state &random);
   void add_debris(int16_t group, vec3<int32_t> const &position, random_state &random);
   std::optional<size_t> add_smoke(int16_t family, std::function<vec3<int32_t>()> attachment, random_state &visual_random);

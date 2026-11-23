@@ -19,10 +19,11 @@ set instead. Playback starts immediately. Press Escape to return to the main
 menu, or let the recording finish. Clicking the window and switching away with
 Alt+Tab both leave playback running.
 
-The native View Demo menu chooses `1 + (current time in seconds % 4)`. It is a
-clock-based choice, not a sequence through the recordings. `--demo` overrides
-only the initial playback; later menu selections use the usual clock choice.
-`--inspect-demo N` opens the same starting mission for live exploration.
+Redux picks a recording at random each time you select View Demo. The DOS menu
+uses the current time in seconds modulo four. `--demo N` selects the initial
+recording. Its input stream uses the original simulation generator so it can
+repeat the pilot's flight. `--inspect-demo N` opens the same starting mission
+for live exploration with fresh Redux rolls.
 In Debug builds, `--frames N` limits playback to N presentations and
 `--screenshot PATH` saves the final frame.
 

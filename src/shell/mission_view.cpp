@@ -19,11 +19,11 @@ input_tape demo_tape(resource_store const &resources, unsigned demo) {
   if(demo < 1 || demo > 4) throw std::runtime_error{"demo must be between 1 and 4"};
   return read_input_tape(read_file(resources.root() / "TAPES" / ("DEMO" + std::to_string(demo) + ".TAP")), resources.edition());
 }
-std::unique_ptr<mission_session> demo_start(resource_store const &resources, input_tape const &tape) {
+std::unique_ptr<mission_session> demo_start(resource_store const &resources, input_tape const &tape, random_state random, fragment_settings fragments) {
   auto const script{read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)])};
   auto const roster{read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)], tape.edition)};
   auto const counters{read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)])};
-  auto result{std::make_unique<mission_session>(resources, script, roster, random_state{}, counters)};
+  auto result{std::make_unique<mission_session>(resources, script, roster, std::move(random), counters, fragments)};
   auto const text{read_interface_strings(tape.starting_files[std::to_underlying(tape_file::objective_text)])};
   if(!text.empty()) {
     for(auto const &line : text.front()) result->objective_text.push_back(line.text);
@@ -33,10 +33,10 @@ std::unique_ptr<mission_session> demo_start(resource_store const &resources, inp
 
 } // anonymous namespace
 
-mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music, view_distances const distances)
-  : mission_view{resources, demo_tape(resources, demo), music, distances} {}
-mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music, view_distances const distances)
-  : mission_view{resources, demo_start(resources, tape), music, distances} {
+mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music, view_distances const distances, fragment_settings fragments)
+  : mission_view{resources, demo_start(resources, demo_tape(resources, demo), random_state{}, fragments), music, distances} {}
+mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music, view_distances const distances, fragment_settings fragments)
+  : mission_view{resources, demo_start(resources, tape, random_state{0}, fragments), music, distances} {
   session->playback(true);
   // Playback restores files beside the TAP, while runtime controls still read
   // DATA/PREFS.CFG and DATA/KEYJOY.CFG. The caller supplies installed preferences.

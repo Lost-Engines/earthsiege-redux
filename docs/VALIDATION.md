@@ -6,6 +6,10 @@ combat and objectives, return/debrief, salvage, repair, construction, progressio
 cinematics, music, effects and speech. It loads the bundled original resources
 directly; DOSBox and x86 emulation are only research tools.
 
+The DOS comparison fixtures supply their original random seeds. Interactive Redux
+sessions use the C++ standard generator. The shipped input tapes still use the
+recorded game's sequence, including when the player changes fragment density.
+
 This is the current baseline for comparison playtesting. The chronological
 [implementation record](IMPLEMENTATION.md) preserves earlier milestones;
 its old lists of unfinished integration are superseded by this page.

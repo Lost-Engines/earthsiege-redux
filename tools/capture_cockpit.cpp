@@ -36,7 +36,7 @@ int main(int argc, char **argv) try {
     mfd_instruments controls{resources, cockpit.layout};
     auto const bounds{controls.button_bounds()};
     auto const origin{cockpit.windows[static_cast<size_t>(cockpit_view::forward)].instrument_origin};
-    mission_view view{resources, demo};
+    mission_view view{resources, tape};
     view.draw();
     view.image().save(output / ("demo" + std::to_string(demo) + "-forward.ppm"), view.colours());
     view.change_cockpit_view(cockpit_view::forward);

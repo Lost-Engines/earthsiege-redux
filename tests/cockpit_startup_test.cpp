@@ -49,7 +49,8 @@ int main(int argc, char **argv) try {
   rng.second = f.integer<uint8_t>();
   random_state random{rng};
   resource_store resources{argv[2]};
-  mission_view live{resources, 1};
+  auto const tape{read_input_tape(read_file(resources.root() / "TAPES/DEMO1.TAP"), resources.edition())};
+  mission_view live{resources, tape};
   live.begin_startup();
   if(!live.starting()) f.fail("nearby-base startup missing");
   auto const player_position{live.simulation().player_actor().body().movement().position};

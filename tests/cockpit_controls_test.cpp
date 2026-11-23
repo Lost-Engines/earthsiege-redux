@@ -82,7 +82,7 @@ int main(int argc, char **argv) try {
     auto const tape{read_input_tape(read_file(resources.root() / "TAPES/DEMO1.TAP"), edition)};
     auto const &files{tape.starting_files};
     mission_session session{resources, read_mission_script(files[std::to_underlying(tape_file::script)]),
-      read_player_roster(files[std::to_underlying(tape_file::player)], edition), random_state{},
+      read_player_roster(files[std::to_underlying(tape_file::player)], edition), random_state{0},
       read_mission_counters(files[std::to_underlying(tape_file::campaign_flags)])};
     auto const count{file.integer<uint8_t>()};
     if(count != (edition == game_edition::original ? 8 : 9)) file.fail("chassis count");

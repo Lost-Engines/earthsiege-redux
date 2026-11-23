@@ -29,7 +29,7 @@ int main(int const argc, char **argv) try {
     for(auto &value : header) value = file.integer<int16_t>();
     auto const script{earthsiege::read_mission_script(tape.starting_files[std::to_underlying(earthsiege::tape_file::script)])};
     if(static_cast<int16_t>(script.header.terrain) != header[0] || script.header.zone != header[1] || script.header.world_variant != header[8] || script.header.palette_variant != header[9]) file.fail("mission world differs");
-    earthsiege::mission_session session{resources, script, roster};
+    earthsiege::mission_session session{resources, script, roster, earthsiege::random_state{0}};
     auto const &world{session.scenery()};
     earthsiege::framebuffer frame;
     earthsiege::scenery_renderer renderer{frame, world, bindings};

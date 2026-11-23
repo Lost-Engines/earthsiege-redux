@@ -94,7 +94,7 @@ int main(int const argc, char **argv) try {
     auto const counts{shorts(file)};
     auto const &shape{std::get<earthsiege::shape_part>(models.roots.at(static_cast<size_t>(definition.model)).content)};
     if(counts != shape.cell_frame_counts) file.fail("effect frame counts differ");
-    earthsiege::random_state random;
+    earthsiege::random_state random{0};
     auto state{earthsiege::create_explosion(definition, counts.size(), position, random)};
     check_state(file, state);
     auto const count{file.integer<uint16_t>()};

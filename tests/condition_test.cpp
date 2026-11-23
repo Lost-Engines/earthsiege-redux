@@ -93,10 +93,10 @@ auto main(int argc, char *argv[])->int try {
     if(earthsiege::crc32(result) != expected_crc) throw std::runtime_error{"random stream differs from original"};
     ++rng_cases;
   }
-  earthsiege::random_state negative_bound;
+  earthsiege::random_state negative_bound{0};
   if(negative_bound.bounded(-5) != 2) throw std::runtime_error{"signed random bound differs from original"};
-  earthsiege::random_state zero_bound;
-  earthsiege::random_state unchanged;
+  earthsiege::random_state zero_bound{0};
+  earthsiege::random_state unchanged{0};
   if(zero_bound.bounded(0) != 0 || zero_bound.next() != unchanged.next()) throw std::runtime_error{"zero random bound advanced the generator"};
   if(rng_cases != 9) throw std::runtime_error{"incomplete random fixtures"};
   std::cout << cases << " native condition comparisons and " << rng_cases << " original random streams agree" << std::endl;

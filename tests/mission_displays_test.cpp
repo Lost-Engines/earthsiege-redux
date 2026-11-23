@@ -33,7 +33,7 @@ int main(int argc, char **argv) try {
     auto const script{read_mission_script(tape.starting_files[std::to_underlying(tape_file::script)])};
     auto const roster{read_player_roster(tape.starting_files[std::to_underlying(tape_file::player)])};
     auto const counters{read_mission_counters(tape.starting_files[std::to_underlying(tape_file::campaign_flags)])};
-    mission_session session{resources, script, roster, random_state{}, counters};
+    mission_session session{resources, script, roster, random_state{0}, counters};
     if(session.player_id() != player || session.activity_state().size() != count) file.fail("mission identity");
     auto const scanner{session.scanner_state(0, 0, 120000)};
     if(scanner.contacts.size() + 1 != count) file.fail("scanner roster size");

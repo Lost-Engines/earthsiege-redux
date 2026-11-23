@@ -13,7 +13,7 @@ Earthsiege Redux builds on the native C++26 reconstruction of **Metaltech: Earth
 
 The March 1995 CD expansion is included alongside the original game. The launcher offers a choice of editions; `--original` and `--expansion` start either directly. Both battlesets, career transfer, Apocalypse, the new enemies and weapons, deployment pods, environments, music and CD cinematics are connected. All four expansion demos now match the original player motion and gameplay RNG throughout; the [replay audit](docs/DEMO_REPLAY.md) covers 11,071 simulation updates. [Expansion integration](docs/EXPANSION.md) describes the original-code comparisons and the limits of that coverage. The 1996 base-game reissue has unchanged 1.0 game files.
 
-The local suite passed 309 tests, including the Linux window check and four complete original recordings whose gameplay states and return files match. The [validation report](docs/VALIDATION.md) describes the original-executable comparisons and remaining presentation and audio timing differences.
+The local suite passed 310 tests, including the Linux window check and four complete original recordings whose gameplay states and return files match. The [validation report](docs/VALIDATION.md) describes the original-executable comparisons and remaining presentation and audio timing differences.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -50,9 +50,23 @@ In DOS, a distant building could lose its silhouette in the haze while its paint
 ./build/earthsiege --demo 2 --lod-distance-multiplier 1 --distance-cutoff-multiplier 1
 ```
 
-### Demos
+### Impact fragments
 
-Options → View Demo chooses one of the four recordings for the selected edition from the current clock value. To play a particular recording immediately, use `--demo N` (1-4):
+`--fragment-count-multiplier N` scales the maximum number of loose pieces thrown by each impact burst. The game normally rolls from zero to 2, 4 or 6 pieces, depending on the damage. At `2` the maxima are 4, 8 and 12. Fractions round the maximum down. The default is `1`. At `0`, hits can still knock a weapon off its mount.
+
+`--fragment-pool-size N` limits how many loose pieces and detached weapons can be in flight at once. The default is `150`. Once the pool fills, further pieces are dropped until a slot opens. A pool of `0` hides both kinds of debris. Damage, smoke and explosions still work.
+
+```sh
+./build/earthsiege --demo 2 --fragment-pool-size 600 --fragment-count-multiplier 4
+```
+
+### Randomness and recorded demos
+
+Redux seeds a standard C++ Mersenne Twister (`std::mt19937`) from `std::random_device` for interactive play. Mission choices, AI decisions, combat and particle bursts draw from it. Replaying the same mission can give you different opponents, shots and damage rolls wherever the game calls for chance.
+
+The eight shipped demos record the pilot's controls. A different combat roll can destroy a HERC the pilot was about to shoot, so tape playback uses the DOS sequence. Both fragment settings work during playback and preserve the recorded action. Taking control with `--inspect-demo` uses Redux randomness.
+
+Options → View Demo picks one of the four recordings for the selected edition at random. Use `--demo N` (1-4) to choose one yourself.
 
 ```sh
 ./build/earthsiege --demo 1
@@ -103,16 +117,15 @@ Campaign saves preserve the original 41-state career format, ordered equipment i
 
 The portable shell now also implements mission-return salvage, ordered equipment awards/restocking, pilot statistics and replacements, technology unlocks, repair budgets and chassis construction. Complete original return/save comparisons cover 96 scenarios (including 144 replacement pilots); repair checks cover 6,400 quotes, 1,280 transactions and 25 construction states. The arming screen supports original clickable mounts, compatible weapon lists, condition-preserving equipment exchange, missile types and HERC selection. Crew and repair screens are connected; construction controls are now connected too. The service bay now animates its original workers, elevators and welding, including partial-construction artwork. Menu music, workshop sounds and the original weapon turn previews are connected. Briefing maps now include the original guided tour, zoom/pan and object callouts. Commander briefings, chapter introductions, departure remarks and single-mission debriefs now include their original voices, captions and animated portraits. Opening, chapter-travel and ending cinematics are connected, along with campaign mechanic response chains, menu doors and credits. --skip-intro skips the opening and pilot-death movie. Presentation and audio timing limits are described in [the validation report](docs/VALIDATION.md).
 
-Launch preparation now matches all 670 retained original GO launches byte for byte (SCRIPT.DAT, MISSION.VAR and PLAYER.MEC), including exact random-generator state. Four complete new-career constructors and 32 additional roster exports cover history initialization, inactive crew and differing pilot health. The shell's original default missile-type normalization and selected-pilot health export behaviour are retained.
+With the DOS generator, launch preparation matches all 670 retained original GO launches byte for byte (SCRIPT.DAT, MISSION.VAR and PLAYER.MEC), including the generator state. Four complete new-career constructors and 32 additional roster exports cover history initialization, inactive crew and differing pilot health. The shell's original default missile-type normalization and selected-pilot health export behaviour are retained.
 
 Mission result export now retains recovered weapons and crew damage for the shell. All 5,114 captured recovery/condition states and four complete starting-world handoffs match. The original writer reads beyond its nine equipment slots for a tenth unused condition; this implementation safely writes 100 for that unused word.
 
 The nineteen mission alerts match captured DOS pixels. Six complete campaign
 progression journeys now match all 121 launch/reload/return/repair/next-mission
 transactions across all three battle sets, including victory and defeat endings
-and the original random-mission lists. Each flight return restores the saved inventory
-and starts the shell's time-seeded RNG again, as the separate DOS executable
-did. Manual career backups remain explicit actions. These comparisons verify
+and the original random-mission lists. Each flight return restores the saved inventory.
+The fixtures also reproduce the shell seed from that DOS run. Manual career backups remain explicit actions. These comparisons verify
 the handoff and persistence, not an entire interactively completed campaign.
 
 Arming comparisons cover 1,650 equipment exchanges, 360 mount menus, 270 missile
@@ -147,7 +160,7 @@ Live frame scheduling, impact flashes and cockpit displacement are integrated.
 
 The original cinematic fade-in reads an uninitialized rectangle type. This build initializes it, giving deterministic fades instead of depending on prior stack contents.
 
-Cockpit damage now flashes the original damage palette and displaces the cockpit and instruments vertically while the outside projection stays steady. The original timing, random sequence and view-change behaviour are retained.
+Cockpit damage flashes the original damage palette and displaces the cockpit and instruments vertically while the outside projection stays steady. The timing and view changes follow the original.
 
 Options / Controls now supports the original joystick profiles, pedals, mouse setting and calibration screens. Tab and Alt+Tab move focus; right-click cycles an option backwards. The first two connected GLFW joysticks supply the original joystick axes, with a single four-axis stick supported as an alternative. Calibrations are saved automatically beside the user saves. Insert or joystick button 2 swaps movement/turret control, button 3 selects a target and button 4 stops movement or centres the turret. Hats follow the original cockpit-view rules.
 

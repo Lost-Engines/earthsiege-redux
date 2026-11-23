@@ -66,11 +66,11 @@ input_tape load_demo(resource_store const &resources, unsigned demo, std::filesy
 }
 demo_playback::demo_playback(resource_store const &r, unsigned demo, preferences const &prefs,
                              std::filesystem::path save_directory, music_settings const &music,
-                             std::filesystem::path const &clock_directory, view_distances const distances)
+                             std::filesystem::path const &clock_directory, view_distances const distances, fragment_settings fragments)
  : resources{r},
    tape{load_demo(r, demo, clock_directory, startup_periods, packet_periods)},
    dialog_cursor{r.read("simvol0", "dci/ALERT.DCI")},
-   view_{r, tape, music, distances},
+   view_{r, tape, music, distances, fragments},
    settings{prefs},
    saves{std::move(save_directory), r.edition()} {
   pointer = view_.initial_pointer();

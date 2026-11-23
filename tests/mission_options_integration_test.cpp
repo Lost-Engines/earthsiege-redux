@@ -113,7 +113,7 @@ int main(int argc, char **argv) try {
   scene.advance_time(100);
   require(scene.step(false, false), "mission resumes after options");
   mission_audio audio{resources};
-  random_state rng;
+  random_state rng{0};
   music_contacts contacts;
   require(audio.play(45), "engine started");
   audio.preferences(false, false, false);
