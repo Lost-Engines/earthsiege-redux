@@ -10,6 +10,7 @@ struct model_detail {
   unsigned int projection_shift{8};
   int16_t scale{1024};
   unsigned int bias{0};
+  double distance_multiplier{1.0};
 };
 
 auto bsp_draw_order(bsp_part const &part, vec3<int32_t> const &eye, std::span<model_transform const> transforms)->std::vector<uint16_t>;

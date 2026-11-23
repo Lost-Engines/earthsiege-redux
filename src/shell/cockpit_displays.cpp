@@ -4,9 +4,10 @@
 
 namespace earthsiege {
 cockpit_displays::cockpit_displays(resource_store const &resources, cockpit_layout const &layout,
-  mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view)
+  mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view, double const lod_multiplier)
   : random{ui_random},
     world_to_camera{scene_view},
+    lod_distance_multiplier{lod_multiplier},
     failure_font{read_font(resources.read("simvol0", "dfn/CPRED.DFN"))},
     failure_label{read_interface_strings(resources.read("simvol0", "str/STRINGS0.STR")).at(30).at(0).text},
     controls{resources, layout},
@@ -144,7 +145,7 @@ void cockpit_displays::paint(mfd_page const page, mission_session &session, came
     communications.draw(cache, bounds, choices);
     break;
   case mfd_page::navigation:
-    navigation.draw(bounds, camera.position, camera.angles, {});
+    navigation.draw(bounds, camera.position, camera.angles, {}, lod_distance_multiplier);
     break;
   case mfd_page::scanner:
     scanner.draw(cache, bounds, session.scanner_state(camera.angles.z, ticks, mfd_ranges[controller.state().range_index]), world_to_camera);
@@ -167,7 +168,7 @@ void cockpit_displays::paint(mfd_page const page, mission_session &session, came
     auto const image{tracker.advance(missiles, explosions)};
     auto const objects{session.visible_objects()};
     auto const ground{session.ground_models()};
-    missile.draw(bounds, image, session.camera_ready(), session.player_sensors().hud_locked, ticks, {}, objects, &effects.lights(), ground);
+    missile.draw(bounds, image, session.camera_ready(), session.player_sensors().hud_locked, ticks, {}, objects, &effects.lights(), ground, lod_distance_multiplier);
     break;
   }
   }

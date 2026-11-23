@@ -57,7 +57,8 @@ missile_display::missile_display(resource_store const &resources, framebuffer &b
     strings{read_interface_strings(resources.read("simvol0", "str/STRINGS0.STR"))} {}
 
 void missile_display::draw(rectangle const &bounds, missile_camera_frame const &frame, bool const ready, bool const locked, uint32_t const ticks,
-                           std::span<light const> lights, std::span<scene_object const> objects, effect_lighting * const dynamic, std::span<ground_flash const> ground) {
+                           std::span<light const> lights, std::span<scene_object const> objects, effect_lighting * const dynamic, std::span<ground_flash const> ground,
+                           double const lod_distance_multiplier) {
   scoped_framebuffer_clip unclipped{target, nullptr};
   if(frame.picture == missile_picture::flash) {
     target.fill(bounds, frame.bright ? 60 : 63);
@@ -84,6 +85,7 @@ void missile_display::draw(rectangle const &bounds, missile_camera_frame const &
   mask.translate(0, 0);
   scoped_framebuffer_clip clipped{target, &mask};
   model_view view;
+  view.detail.distance_multiplier = lod_distance_multiplier;
   view.bounds = bounds;
   view.cull_bounds = true;
   view.projection.perspective_shift = 7;

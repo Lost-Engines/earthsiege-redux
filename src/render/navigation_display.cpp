@@ -10,7 +10,7 @@ navigation_display::navigation_display(framebuffer &buffer, scenery_world const 
   apply_cockpit_map_shading(colours);
 }
 
-void navigation_display::draw(rectangle const &bounds, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<light const> lights) {
+void navigation_display::draw(rectangle const &bounds, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<light const> lights, double const lod_distance_multiplier) {
   scoped_framebuffer_clip clip{target, nullptr};
   target.fill(bounds, 23);
   auto map_position{position};
@@ -20,6 +20,7 @@ void navigation_display::draw(rectangle const &bounds, vec3<int32_t> const &posi
   auto camera{rotation_transform(map_angles)};
   camera.translation = map_position;
   model_view view;
+  view.detail.distance_multiplier = lod_distance_multiplier;
   view.camera = inverse_transform(camera);
   view.bounds = bounds;
   view.projection.perspective_shift = 7;

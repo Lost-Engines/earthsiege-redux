@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
@@ -42,6 +43,15 @@ auto integer_option(std::string_view text)->unsigned int {
   return result;
 }
 
+auto lod_distance_option(std::string_view text)->double {
+  double value{};
+  auto const [end, error]{std::from_chars(text.data(), text.data() + text.size(), value)};
+  if(error != std::errc{} || end != text.data() + text.size() || !std::isfinite(value) || value <= 0.0) {
+    throw std::runtime_error{"--lod-distance-multiplier expects a finite number greater than zero"};
+  }
+  return value;
+}
+
 auto resolution_option(std::string_view text)->std::optional<earthsiege::render_size> {
   if(text == "window" || text == "auto") return {};
   auto const separator{text.find_first_of("xX")};
@@ -75,6 +85,7 @@ auto main(int argc, char *argv[])->int try {
   std::optional<std::filesystem::path> requested_soundfont;
   unsigned int scale{0};
   std::optional<earthsiege::render_size> fixed_resolution;
+  double lod_distance_multiplier{1.0};
   std::optional<unsigned int> inspect_demo;
   std::optional<unsigned int> requested_demo;
   unsigned int frame_limit{0};
@@ -93,6 +104,7 @@ auto main(int argc, char *argv[])->int try {
         "  --soundfont PATH      SoundFont for the General MIDI music option\n"
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
+        "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 1.0, higher keeps detail farther away)\n"
         "  --scale N             Initial window size as a multiple of 320x200\n"
         "  --screenshot PATH     Save a PPM at the render resolution\n"
         "  --frames N            Exit after N frames\n"
@@ -136,6 +148,10 @@ auto main(int argc, char *argv[])->int try {
       fixed_resolution = resolution_option(argv[++index]);
     } else if(argument.starts_with("--resolution=")) {
       fixed_resolution = resolution_option(argument.substr(13));
+    } else if(argument == "--lod-distance-multiplier" && index + 1 < argc) {
+      lod_distance_multiplier = lod_distance_option(argv[++index]);
+    } else if(argument.starts_with("--lod-distance-multiplier=")) {
+      lod_distance_multiplier = lod_distance_option(argument.substr(argument.find('=') + 1));
     } else if(argument == "--scale" && index + 1 < argc) {
       scale = integer_option(argv[++index]);
     } else if(argument == "--frames" && index + 1 < argc) {
@@ -209,7 +225,7 @@ auto main(int argc, char *argv[])->int try {
   earthsiege::framebuffer menu_frame;
   std::unique_ptr<earthsiege::mission_view> scene;
   if(inspect_demo) {
-    scene = std::make_unique<earthsiege::mission_view>(resources, *inspect_demo, music_settings);
+    scene = std::make_unique<earthsiege::mission_view>(resources, *inspect_demo, music_settings, lod_distance_multiplier);
     scene->configure_input(menu.settings(), menu.device_calibrations());
     auto const p{scene->initial_pointer()};
     if(display) display->warp_mouse(p.x, p.y);
@@ -519,7 +535,7 @@ auto main(int argc, char *argv[])->int try {
       if(sound) sound->clear();
       auto const demo{requested_demo.value_or(1 + static_cast<unsigned>(std::time(nullptr) % 4))};
       requested_demo.reset();
-      earthsiege::demo_playback playback{resources, demo, menu.settings(), save_directory, music_settings, bundled_data / "demo-clocks"};
+      earthsiege::demo_playback playback{resources, demo, menu.settings(), save_directory, music_settings, bundled_data / "demo-clocks", lod_distance_multiplier};
       std::cout << "Playing " << (resources.edition() == earthsiege::game_edition::expansion ? "expansion" : "original") << " demo " << demo << '\n';
       auto const demo_events{[&]{
         earthsiege::window_event event{};
@@ -604,7 +620,7 @@ auto main(int argc, char *argv[])->int try {
     }
     if(menu.ready_to_launch()) {
       inspect_demo.reset();
-      scene = std::make_unique<earthsiege::mission_view>(resources, menu.launch(), music_settings);
+      scene = std::make_unique<earthsiege::mission_view>(resources, menu.launch(), music_settings, lod_distance_multiplier);
       scene->render_resolution(render_resolution());
       scene->configure_input(menu.settings(), menu.device_calibrations());
       scene->begin_startup();
@@ -677,7 +693,7 @@ auto main(int argc, char *argv[])->int try {
         if(sound) sound->queue(samples);
         pending -= 25;
       }
-      menu.draw(menu_frame, render_resolution());
+      menu.draw(menu_frame, render_resolution(), lod_distance_multiplier);
     }
     if(alert) {
       alert_frame = scene ? scene->image() : menu_frame;

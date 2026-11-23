@@ -49,7 +49,7 @@ public:
   missile_display(resource_store const &resources, framebuffer &target, scenery_world const &world);
   void draw(rectangle const &bounds, missile_camera_frame const &frame, bool ready, bool locked, uint32_t ticks,
             std::span<light const> lights, std::span<scene_object const> objects = {}, effect_lighting *dynamic = nullptr,
-            std::span<ground_flash const> ground = {});
+            std::span<ground_flash const> ground = {}, double lod_distance_multiplier = 1.0);
 };
 
 } // namespace earthsiege

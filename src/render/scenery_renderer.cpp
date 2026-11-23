@@ -135,6 +135,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
       auto const eye{inverse_transform(compose_transforms(placement, view.camera)).translation};
       auto detail{shapes ? shapes->actor : actor.detail};
       detail.projection_shift = view.projection.perspective_shift;
+      detail.distance_multiplier = view.detail.distance_multiplier;
       auto const root{actor.roots.size() == 1 ? 0 : actor_detail_index(actor.roots.size(), actor.detail_thresholds, radius, eye, detail)};
       auto actor_view{view};
       if(shapes) {

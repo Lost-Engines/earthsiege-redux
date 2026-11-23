@@ -33,19 +33,20 @@ std::unique_ptr<mission_session> demo_start(resource_store const &resources, inp
 
 } // anonymous namespace
 
-mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music)
-  : mission_view{resources, demo_tape(resources, demo), music} {}
-mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music)
-  : mission_view{resources, demo_start(resources, tape), music} {
+mission_view::mission_view(resource_store const &resources, unsigned int const demo, music_settings const &music, double const lod_multiplier)
+  : mission_view{resources, demo_tape(resources, demo), music, lod_multiplier} {}
+mission_view::mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music, double const lod_multiplier)
+  : mission_view{resources, demo_start(resources, tape), music, lod_multiplier} {
   session->playback(true);
   // Playback restores files beside the TAP, while runtime controls still read
   // DATA/PREFS.CFG and DATA/KEYJOY.CFG. The caller supplies installed preferences.
 }
 
-mission_view::mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music)
+mission_view::mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music, double const lod_multiplier)
   : session{std::move(mission)},
     ui_random{session->interface_random()},
     audio{resources, music},
+    lod_distance_multiplier{lod_multiplier},
     cockpit{read_cockpit(resources, read_resource_names(resources.read("simvol0", "nam/MECHS.NAM")).at(static_cast<size_t>(session->player_chassis())))},
     reactor{resources, cockpit.layout},
     throttle{resources, cockpit.layout},
@@ -126,8 +127,8 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
   });
   radio->speech_output([this](std::string_view path){return audio.speech(path);});
   session->on_radio([this](radio_event const &event){radio->submit(event, interface_ticks);});
-  displays = std::make_unique<cockpit_displays>(resources, cockpit.layout, *session, instruments, ui_random, renderer.last_view_transform());
-  hdd = std::make_unique<cockpit_hdd>(resources, cockpit.layout, *session, instruments, ui_random);
+  displays = std::make_unique<cockpit_displays>(resources, cockpit.layout, *session, instruments, ui_random, renderer.last_view_transform(), lod_multiplier);
+  hdd = std::make_unique<cockpit_hdd>(resources, cockpit.layout, *session, instruments, ui_random, lod_multiplier);
   for(size_t i{0}; i < edge_controls.size(); ++i) edge_controls[i] = instruments.add_button(cockpit_edge_bounds(0)[i]);
   auto const origin{instrument_origin()};
   displays->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
@@ -850,6 +851,7 @@ void mission_view::draw() {
   if(shift) mask.translate(0, -shift);
   auto &colours{impact.snapshot().impact_palette ? impact_colours : display_colours};
   model_view view;
+  view.detail.distance_multiplier = lod_distance_multiplier;
   view.cull_bounds = true;
   if(options_camera) {
     view.bounds = {0, 0, 319, 110};

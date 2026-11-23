@@ -12,7 +12,7 @@ class navigation_display {
   model_renderer models;
 public:
   navigation_display(framebuffer &target, scenery_world const &world);
-  void draw(rectangle const &bounds, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<light const> lights);
+  void draw(rectangle const &bounds, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<light const> lights, double lod_distance_multiplier = 1.0);
 };
 
 } // namespace earthsiege

@@ -20,9 +20,10 @@ vec2<int32_t> tactical_project(vec3<int32_t> const &point, vec3<int32_t> const &
   return {bounds.left + ((bounds.right - bounds.left) >> 1) + wrap_long(static_cast<int64_t>(point.x - camera.x) * (1 << projection_shift)) / distance,
           bounds.top + ((bounds.bottom - bounds.top) >> 1) - wrap_long(static_cast<int64_t>(point.y - camera.y) * (1 << projection_shift)) / distance};
 }
-tactical_map::tactical_map(resource_store const &resources, framebuffer &buffer, scenery_world const &source)
+tactical_map::tactical_map(resource_store const &resources, framebuffer &buffer, scenery_world const &source, double const lod_multiplier)
   : target{buffer},
     world{source},
+    lod_distance_multiplier{lod_multiplier},
     colours{source.colours()},
     models{buffer, colours},
     icons{read_bitmaps(resources.read("simvol0", "dba/ICONS.DBA"))} {
@@ -66,6 +67,7 @@ std::vector<tactical_hit> tactical_map::draw(rectangle const &bounds, tactical_m
   auto camera{rotation_transform({49152, 0, 0})};
   camera.translation = state.camera;
   model_view view;
+  view.detail.distance_multiplier = lod_distance_multiplier;
   view.camera = inverse_transform(camera);
   view.bounds = bounds;
   view.projection.perspective_shift = state.projection_shift;

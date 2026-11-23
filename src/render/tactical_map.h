@@ -46,11 +46,12 @@ vec2<int32_t> tactical_project(vec3<int32_t> const &point, vec3<int32_t> const &
 class tactical_map {
   framebuffer &target;
   scenery_world const &world;
+  double lod_distance_multiplier;
   palette colours;
   model_renderer models;
   std::vector<bitmap> icons;
 public:
-  tactical_map(resource_store const &resources, framebuffer &target, scenery_world const &world);
+  tactical_map(resource_store const &resources, framebuffer &target, scenery_world const &world, double lod_distance_multiplier = 1.0);
   std::vector<tactical_hit> draw(rectangle const &bounds, tactical_map_state const &state);
 };
 } // namespace earthsiege

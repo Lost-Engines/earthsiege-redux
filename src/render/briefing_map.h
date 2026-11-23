@@ -78,6 +78,6 @@ public:
  void restore_view();
  static constexpr rectangle map_bounds{15, 12, 283, 143};
  void hover(int x, int y, rectangle bounds = map_bounds);
- void draw(framebuffer&, rectangle bounds = map_bounds, render_size output = {});
+ void draw(framebuffer&, rectangle bounds = map_bounds, render_size output = {}, double lod_distance_multiplier = 1.0);
 };
 }

@@ -13,6 +13,7 @@ namespace earthsiege {
 class cockpit_displays {
   random_state &random;
   model_transform const &world_to_camera;
+  double lod_distance_multiplier;
   instrument_failure_state failure;
   font failure_font;
   std::string failure_label;
@@ -38,7 +39,7 @@ class cockpit_displays {
   void transmit(size_t choice, mission_session &session);
   void paint(mfd_page page, mission_session &session, camera_state const &camera, uint32_t ticks);
 public:
-  cockpit_displays(resource_store const &resources, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view);
+  cockpit_displays(resource_store const &resources, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &ui_random, model_transform const &scene_view, double lod_distance_multiplier = 1.0);
   std::vector<uint16_t> take_sounds();
   bool command(uint16_t code, mission_session &session, pointer_controls &input);
   bool activate(control_activation const &action, mission_session &session, pointer_controls &input);

@@ -53,6 +53,7 @@ class mission_view {
   framebuffer world_frame;
   framebuffer world_target;
   render_size scene_size;
+  double lod_distance_multiplier;
   cockpit_artwork cockpit;
   reactor_gauge reactor;
   throttle_gauge throttle;
@@ -157,9 +158,9 @@ class mission_view {
   std::deque<uint16_t> commands;
 
 public:
-  mission_view(resource_store const &resources, unsigned int demo, music_settings const &music = {});
-  mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music = {});
-  mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music = {});
+  mission_view(resource_store const &resources, unsigned int demo, music_settings const &music = {}, double lod_distance_multiplier = 1.0);
+  mission_view(resource_store const &resources, input_tape const &tape, music_settings const &music = {}, double lod_distance_multiplier = 1.0);
+  mission_view(resource_store const &resources, std::unique_ptr<mission_session> mission, music_settings const &music = {}, double lod_distance_multiplier = 1.0);
   void configure_music(music_settings const &settings) {
     audio.configure_music(settings);
   }

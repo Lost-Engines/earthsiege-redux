@@ -516,7 +516,7 @@ void briefing_map::hover(int x, int y, rectangle bounds) {
   }
   // Original selection remains latched after the pointer leaves its hotspot.
 }
-void briefing_map::draw(framebuffer &target, rectangle bounds, render_size output) {
+void briefing_map::draw(framebuffer &target, rectangle bounds, render_size output, double const lod_distance_multiplier) {
   screen_mask mask;
   for(int y{std::max(0, bounds.top)}; y <= std::min(199, bounds.bottom); ++y) mask.rows[static_cast<size_t>(y)].push_back({bounds.left, bounds.right});
   mask.regions.push_back({bounds.top, std::vector<scanline_span>(static_cast<size_t>(bounds.bottom - bounds.top + 1), {bounds.left, bounds.right}), true});
@@ -530,6 +530,7 @@ void briefing_map::draw(framebuffer &target, rectangle bounds, render_size outpu
   auto transform{rotation_transform({49152, 0, 0})};
   transform.translation = eye;
   model_view view;
+  view.detail.distance_multiplier = lod_distance_multiplier;
   view.camera = inverse_transform(transform);
   view.bounds = bounds;
   view.detail.projection_shift = 7;

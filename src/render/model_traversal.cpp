@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include "simulation/model_math.h"
 
@@ -70,7 +72,15 @@ auto approximate_distance(vec3<int32_t> const &point)->int32_t {
 }
 
 auto projected_radius(int16_t radius, vec3<int32_t> const &eye, model_detail const &detail)->int32_t {
-  int32_t const distance{std::max(1, approximate_distance(eye) - radius)};
+  auto const centre_distance{approximate_distance(eye)};
+  int32_t distance{std::max(1, centre_distance - radius)};
+  if(detail.distance_multiplier != 1.0) {
+    if(!(detail.distance_multiplier > 0.0 && std::isfinite(detail.distance_multiplier))) throw std::invalid_argument{"LOD distance multiplier must be finite and positive"};
+    // Scale the camera-to-model distance before subtracting the authored radius.
+    // Rounding up preserves the last integer distance included in each LOD.
+    auto const effective{std::ceil(centre_distance / detail.distance_multiplier) - radius};
+    distance = static_cast<int32_t>(std::clamp(effective, 1.0, static_cast<double>(std::numeric_limits<int32_t>::max())));
+  }
   int32_t projected{wrap(static_cast<int64_t>(radius) * (int64_t{1} << detail.projection_shift)) / distance};
   if(projected == 0) projected = 1;
   int64_t const scaled{static_cast<int64_t>(projected) * detail.scale};

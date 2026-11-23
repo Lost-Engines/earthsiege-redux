@@ -87,7 +87,7 @@ class cockpit_hdd {
   void pick(mission_session &session, int32_t range);
   void paint(mission_session &session);
 public:
-  cockpit_hdd(resource_store const &resources, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &ui_random);
+  cockpit_hdd(resource_store const &resources, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &ui_random, double lod_distance_multiplier = 1.0);
   bool command(uint16_t code, mission_session &session, pointer_controls &input, int32_t range);
   bool activate(control_activation const &action, mission_session &session, pointer_controls &input, int32_t range);
   void pointer(int x, int y);

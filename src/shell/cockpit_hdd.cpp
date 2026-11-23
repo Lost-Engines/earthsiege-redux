@@ -23,9 +23,9 @@ void outline(framebuffer &target, rectangle const &b, uint8_t colour) {
   target.fill({b.right, b.top, b.right, b.bottom}, colour);
 }
 }
-cockpit_hdd::cockpit_hdd(resource_store const &r, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &rng)
+cockpit_hdd::cockpit_hdd(resource_store const &r, cockpit_layout const &layout, mission_session &session, pointer_controls &input, random_state &rng, double const lod_distance_multiplier)
  : random{rng},
-   map{r, cache, session.scenery()},
+   map{r, cache, session.scenery(), lod_distance_multiplier},
    damage{r},
    controller{r.edition() == game_edition::expansion},
    map_state{session.tactical_state(0)},

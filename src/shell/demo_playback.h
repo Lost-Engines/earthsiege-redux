@@ -42,7 +42,7 @@ private:
 public:
   demo_playback(resource_store const &, unsigned demo, preferences const &,
                 std::filesystem::path save_directory, music_settings const &music = {},
-                std::filesystem::path const &clock_directory = {});
+                std::filesystem::path const &clock_directory = {}, double lod_distance_multiplier = 1.0);
   mission_view &view() {
     return view_;
   }

@@ -36,6 +36,16 @@ By default the game draws at the window's current pixel dimensions, including on
 
 The first command fixes the render size at 1280×800, even if you resize the window. The second opens a 960×600 window and follows subsequent resizes. The third gives the original 320×200 rendering in a 1280×800 window. Both editions accept the same options.
 
+### Model detail
+
+`--lod-distance-multiplier N` scales the distance at which HERCs, mounted weapons and other model parts switch to simpler geometry. The default, `1.0`, uses the original distances. At `2.0` each switch happens twice as far from the model. At `0.5` it happens half as far away. The Shapes setting still determines the finest detail available, and each mission keeps its own visibility range.
+
+```sh
+./build/earthsiege --demo 3 --lod-distance-multiplier 2.0
+```
+
+### Demos
+
 Options → View Demo chooses one of the four recordings for the selected edition from the current clock value. To play a particular recording immediately, use `--demo N` (1-4):
 
 ```sh
