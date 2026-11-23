@@ -361,7 +361,7 @@ add_library(earthsiege_core
   src/resources/resource_store.cpp
   src/resources/resource_store.h
 )
-target_link_libraries(earthsiege_core PRIVATE nuked_opl3 MT32Emu::mt32emu sc55_backend tinysoundfont)
+target_link_libraries(earthsiege_core PRIVATE nuked_opl3 MT32Emu::mt32emu sc55_backend tinysoundfont Threads::Threads)
 target_include_directories(earthsiege_core PUBLIC src "${PROJECT_SOURCE_DIR}")
 target_compile_definitions(earthsiege_core PUBLIC VECTORSTORM_NO_BOOST)
 target_compile_options(earthsiege_core PUBLIC
@@ -376,6 +376,8 @@ add_executable(earthsiege
   src/platform/audio_output.cpp
   src/platform/window.cpp
   src/platform/window.h
+  src/platform/indexed_display.cpp
+  src/platform/indexed_display.h
   src/platform/paths.cpp
 )
 target_link_libraries(earthsiege PRIVATE earthsiege_core glfw OpenGL::GL pcm_device)
@@ -1480,7 +1482,7 @@ if(BUILD_TESTING)
   add_test(NAME platform_transport COMMAND platform_transport_test)
   option(EARTHSIEGE_TEST_WINDOW "Test the real GLFW/OpenGL presenter (requires a display)" OFF)
   if(EARTHSIEGE_TEST_WINDOW)
-    add_executable(platform_window_test tests/platform_window_test.cpp src/platform/window.cpp)
+    add_executable(platform_window_test tests/platform_window_test.cpp src/platform/window.cpp src/platform/indexed_display.cpp)
     target_link_libraries(platform_window_test PRIVATE earthsiege_core glfw OpenGL::GL)
     add_test(NAME platform_window COMMAND platform_window_test)
   endif()

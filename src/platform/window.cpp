@@ -2,9 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
-#ifdef _WIN32
-#include <GL/glext.h>
-#endif // _WIN32
+#include "indexed_display.h"
 #include "render/software_cursor.h"
 #include "resources/artwork.h"
 #include "viewport.h"
@@ -68,16 +66,9 @@ window::window(unsigned int scale, std::optional<render_size> resolution) : fixe
   }
   glfwMakeContextCurrent(handle.get());
   glfwSwapInterval(1);
-  glGenTextures(1, &texture);
-  glBindTexture(GL_TEXTURE_2D, texture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  presenter = std::make_unique<indexed_display>();
   glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size);
   glDisable(GL_DITHER);
-  glEnable(GL_TEXTURE_2D);
-  glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
   glfwSetWindowUserPointer(handle.get(), this);
   glfwSetInputMode(handle.get(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
   glfwSetWindowCloseCallback(handle.get(), [](GLFWwindow *w){self(w).events.push_back({.type = event_type::close});});
@@ -143,7 +134,6 @@ window::window(unsigned int scale, std::optional<render_size> resolution) : fixe
 
 window::~window() {
   glfwMakeContextCurrent(handle.get());
-  glDeleteTextures(1, &texture);
 }
 void window::draw(framebuffer const &frame, palette const &colours, software_cursor const *cursor) {
   int width{0}, height{0};
@@ -151,41 +141,20 @@ void window::draw(framebuffer const &frame, palette const &colours, software_cur
   if(width <= 0 || height <= 0) return;
   auto const canvas{resolution()};
   auto const area{viewport::fit(width, height, canvas)};
-  auto presented{frame};
+  std::optional<framebuffer> marked;
   if(cursor && focused() && glfwGetWindowAttrib(handle.get(), GLFW_HOVERED)) {
     auto const p{pointer_position()};
-    if(p[0] >= 0 && p[0] < 320 && p[1] >= 0 && p[1] < 200) cursor->draw(presented, p[0], p[1]);
+    if(p[0] >= 0 && p[0] < 320 && p[1] >= 0 && p[1] < 200) cursor->draw(marked.emplace(frame), p[0], p[1]);
   }
-  auto const size{canvas.artwork_size()};
-  if(resolved.size() != size) resolved = framebuffer{size};
-  presented.blit_to(resolved, size.bounds());
-  std::array<std::array<uint8_t, 4>, 256> lookup;
-  for(size_t i{0}; i < lookup.size(); ++i) {
-    auto const rgb{colours.colours[i]};
-    lookup[i] = {static_cast<uint8_t>(rgb >> 16), static_cast<uint8_t>(rgb >> 8), static_cast<uint8_t>(rgb), 255};
-  }
-  display.resize(size.count());
-  std::ranges::transform(resolved.pixels(), display.begin(), [&](uint8_t index){return lookup[index];});
+  presenter->bind(marked ? *marked : frame, colours, canvas.artwork_size(), area, height);
   glViewport(0, 0, width, height);
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
   glViewport(area.x, height - area.y - area.height, area.width, area.height);
-  glBindTexture(GL_TEXTURE_2D, texture);
-  if(size != texture_size) {
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, size.width, size.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, display.data());
-    if(glGetError() != GL_NO_ERROR) throw std::runtime_error{"cannot allocate the display texture"};
-    texture_size = size;
-  } else {
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size.width, size.height, GL_RGBA, GL_UNSIGNED_BYTE, display.data());
-  }
   glBegin(GL_TRIANGLE_STRIP);
-  glTexCoord2f(0, 0);
   glVertex2f(-1, 1);
-  glTexCoord2f(0, 1);
   glVertex2f(-1, -1);
-  glTexCoord2f(1, 0);
   glVertex2f(1, 1);
-  glTexCoord2f(1, 1);
   glVertex2f(1, -1);
   glEnd();
 }

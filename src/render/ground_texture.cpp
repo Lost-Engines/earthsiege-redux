@@ -2,8 +2,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <future>
 #include <limits>
 #include <stdexcept>
+#include <thread>
 #include "render/polygon_raster.h"
 #include "simulation/fixed_math.h"
 #include "simulation/model_math.h"
@@ -12,6 +14,12 @@ namespace {
 int32_t divide(int32_t a, int32_t b) {
   if(!b || (a == std::numeric_limits<int32_t>::min() && b == -1)) throw std::domain_error{"original ground projection division outside range"};
   return a / b;
+}
+// The texture repeats every 256 texels. Convert to a floor before wrapping,
+// including on the negative side of the origin.
+uint8_t wrapped_texel(double coordinate) {
+  auto const whole{static_cast<int64_t>(coordinate)};
+  return static_cast<uint8_t>(whole - (coordinate < static_cast<double>(whole)));
 }
 vec2<int32_t> rotate(vec2<int32_t> const &p, uint16_t angle, bool inverse = false) {
   int32_t const c{model_cosine(angle)};
@@ -153,7 +161,8 @@ void ground_texture::draw(framebuffer &target, vec3<int32_t> const &position, ve
 void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles,
                                  background_view const &view, background_bands const &bands) const {
   auto const size{target.size()};
-  auto const area{size.from_logical(view.bounds)};
+  auto const area{size.from_logical(view.bounds).intersect(size.bounds())};
+  if(area.left > area.right || area.top > area.bottom) return;
   auto cos_angle{[](uint16_t a){ return model_cosine(a) / 16384.; }};
   auto sin_angle{[&](uint16_t a){ return cos_angle(static_cast<uint16_t>(a - 16384)); }};
   auto const cp{cos_angle(angles.x)}, sp{sin_angle(angles.x)};
@@ -163,30 +172,74 @@ void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &posit
   double const texel{std::ldexp(1., -static_cast<int>(texture_scale))};
   auto const horizon{bands.horizon[0]};
   double const step{320. / size.width};
-  for(int y{std::max(0, area.top)}; y <= std::min(size.height - 1, area.bottom); ++y) {
+  std::vector<double> offsets;
+  if(sr == 0) {
+    // Retain the original pixel-centre increments, including fractional scales.
+    offsets.reserve(area.width());
+    double lx{(area.left + .5) * step};
+    for(int x{area.left}; x <= area.right; ++x, lx += step) offsets.push_back(cr * (lx - view.centre.x));
+  }
+  auto const distance_shade{[&](double distance) {
+    return std::upper_bound(thresholds.begin(), thresholds.begin() + 14, distance) - thresholds.begin();
+  }};
+  auto const sample{[&](double lateral, double distance, size_t shade) {
+    auto const u{wrapped_texel((position.x + cy * lateral - sy * distance) * texel)};
+    auto const v{wrapped_texel((position.y + sy * lateral + cy * distance) * texel)};
+    return shades[shade][source[v * 256 + u] & 15];
+  }};
+  auto const draw_row{[&](int y) {
     double const ly{(y + .5) * 200. / size.height};
-    int const left{std::max(0, area.left)};
-    double lx{(left + .5) * step};
-    for(int x{left}; x <= std::min(size.width - 1, area.right); ++x, lx += step) {
+    double lx{(area.left + .5) * step};
+    auto const dy{ly - view.centre.y};
+    // With a horizontal horizon every ray on this scanline has the same depth.
+    if(sr == 0) {
+      auto const below{(ly - horizon.y) * cr};
+      if(below < 0) return;
+      auto const down{cr * dy + 1};
+      auto const ray_z{focal * sp - down * cp};
+      if(ray_z < 0 && below >= fog_rows) {
+        auto const distance{-position.z * (focal * cp + down * sp) / ray_z};
+        auto const shade{distance_shade(distance)};
+        if(shade < 14) {
+          auto const scale{(-position.z * sp + distance * cp) / focal};
+          auto row{target.opaque_span(y, area.left, area.right)};
+          std::ranges::transform(offsets, row.begin(), [&](double offset){return sample(offset * scale, distance, shade);});
+          return;
+        }
+      }
+      target.fill({area.left, y, area.right, y}, shades[14][0]);
+      return;
+    }
+    for(int x{area.left}; x <= area.right; ++x, lx += step) {
       auto const below{(lx - horizon.x) * sr + (ly - horizon.y) * cr};
       if(below < 0) continue;
-      auto const dx{lx - view.centre.x}, dy{ly - view.centre.y};
+      auto const dx{lx - view.centre.x};
       auto const down{sr * dx + cr * dy + 1};
       auto const ray_z{focal * sp - down * cp};
       uint8_t colour{shades[14][0]};
       if(ray_z < 0 && below >= fog_rows) {
         auto const distance{-position.z * (focal * cp + down * sp) / ray_z};
-        auto const shade{std::upper_bound(thresholds.begin(), thresholds.begin() + 14, distance) - thresholds.begin()};
+        auto const shade{distance_shade(distance)};
         if(shade < 14) {
           auto const lateral{(cr * dx - sr * dy) * (-position.z * sp + distance * cp) / focal};
-          auto const u{static_cast<int64_t>(std::floor((position.x + cy * lateral - sy * distance) * texel))};
-          auto const v{static_cast<int64_t>(std::floor((position.y + sy * lateral + cy * distance) * texel))};
-          colour = shades[shade][source[(v & 255) * 256 + (u & 255)] & 15];
+          colour = sample(lateral, distance, shade);
         }
       }
       target.pixel(x, y, colour);
     }
-  }
+  }};
+  // Each ray samples the same immutable ground map and writes into its own
+  // output row. Interleave rows so that the horizon's empty sky is shared.
+  constexpr int pixels_per_job{512 * 1024};
+  static int const cores{static_cast<int>(std::max(1u, std::thread::hardware_concurrency()))};
+  int const jobs{std::clamp(area.width() * area.height() / pixels_per_job, 1, std::min(cores, area.height()))};
+  auto const draw_rows{[&](int first) {
+    for(int y{area.top + first}; y <= area.bottom; y += jobs) draw_row(y);
+  }};
+  std::vector<std::future<void>> workers;
+  for(int i{1}; i < jobs; ++i) workers.push_back(std::async(std::launch::async | std::launch::deferred, draw_rows, i));
+  draw_rows(0);
+  for(auto &worker : workers) worker.get();
 }
 
 void ground_texture::draw_expansion(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles, background_view const &view, background_bands const &bands) {

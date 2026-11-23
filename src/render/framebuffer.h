@@ -14,6 +14,12 @@ struct bitmap;
 struct font;
 struct palette;
 
+struct indexed_region {
+  render_size size;
+  int stride;
+  uint8_t const *pixels;
+};
+
 struct scanline_span {
   int left;
   int right;
@@ -52,6 +58,8 @@ public:
   render_size size() const { return extent; }
   bool has_detail() const { return static_cast<bool>(detail); }
   render_size detail_size() const { return {detail_area.width(), detail_area.height()}; }
+  indexed_region detail_region() const;
+  std::span<uint8_t const> detail_mask() const { return detail ? std::span{visible} : std::span<uint8_t const>{}; }
   void attach(std::shared_ptr<framebuffer const> image, rectangle area, screen_mask const *window = nullptr);
   void restore_world(framebuffer const &source, screen_mask const &window);
   void blit_to(framebuffer &dest, rectangle area) const;
@@ -62,6 +70,8 @@ public:
   void clip(screen_mask const *value);
   void clear(uint8_t colour = 0);
   void pixel(int x, int y, uint8_t colour);
+  // For a rasterizer overwriting every pixel of an already clipped span.
+  std::span<uint8_t> opaque_span(int y, int left, int right);
   void fill(rectangle area, uint8_t colour);
   void line(int x0, int y0, int x1, int y1, uint8_t colour);
   void image(bitmap const &source, int x, int y, bool transparent = false);

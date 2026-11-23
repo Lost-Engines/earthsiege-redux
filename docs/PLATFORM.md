@@ -15,9 +15,21 @@ the original 8:5 picture. The ground sampler uses the selected resolution and
 the mission's original texture and distance palette. Cockpit instruments, HUD
 symbols and menus use the authored 320×200 layout. A cockpit page keeps the
 detailed scene behind its window mask so that HUD writes, cursors and page
-pans all cover the correct pixels. OpenGL presents the result with nearest
-filtering. Mouse input and cursor warps use the same fitted rectangle as the
-screen, including on HiDPI displays.
+pans all cover the correct pixels. OpenGL receives the original palette indices
+and the 256-colour palette. For each window pixel, the display shader checks
+the cockpit mask, samples the artwork or the detailed scene and looks up its
+colour. A fully covered scene needs no world texture upload. The shader and
+the screenshot renderer use the same nearest-neighbour cell boundaries. Mouse
+input and cursor warps use the same fitted rectangle, including on HiDPI displays.
+
+The launch lift has shorter frame intervals than ordinary driving. The first
+115 frames of retail demo 2 take 3.296 seconds on its recorded clock. To replay
+the lift and its final shake at 4K, run
+`./build/earthsiege --original --demo 2 --resolution 3840x2160 --frames 150`.
+At high resolutions, the ground rasterizer shares large draws across CPU cores.
+With a level horizon it calculates depth and fog once per scanline. The horizon
+bitmap scales by filling the screen area covered by each run of like-coloured
+texels, leaving transparent pixels alone.
 
 GLFW callbacks append to an ordered input queue. A mission modal can stop
 consuming that queue and resume it at the original simulation call site, so a
@@ -73,5 +85,7 @@ The migration passed all 272 standard tests and the additional window check.
 A separate X11 keyboard check exercised music selection, saved preferences,
 Cancel and recovery from a missing SoundFont. The original-executable comparison
 suite covers gameplay, the 320×200 renderer and music scheduling. The Redux
-window check also resizes the framebuffer and reads back two adjacent pixels
-from a high-resolution scene.
+window check also reads back a full composited frame and compares it with the
+software renderer after a resize, a palette change and a full-screen cover. It
+checks a cropped cockpit page with a fixed render size in a differently sized
+window as well.

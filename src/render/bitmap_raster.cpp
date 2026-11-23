@@ -11,6 +11,29 @@ void draw_scaled_bitmap(framebuffer &target, bitmap const &source, vec2<int32_t>
   int32_t const bottom{std::min(bounds.bottom, position.y + size.y - 1)};
   if(left > right || top > bottom) return;
   if(target.size() != render_size{}) {
+    if(size.x > static_cast<int>(source.width) && size.y > static_cast<int>(source.height)) {
+      // One source texel covers a rectangle at high resolution. Adjacent
+      // texels of the same colour can be painted with a single span fill.
+      auto const first_x{static_cast<int>(int64_t{left - position.x} * source.width / size.x)};
+      auto const last_x{static_cast<int>(int64_t{right - position.x} * source.width / size.x)};
+      auto const first_y{static_cast<int>(int64_t{top - position.y} * source.height / size.y)};
+      auto const last_y{static_cast<int>(int64_t{bottom - position.y} * source.height / size.y)};
+      for(int sy{first_y}; sy <= last_y; ++sy) {
+        auto const *row{source.pixels.data() + static_cast<size_t>(sy) * source.width};
+        int const y0{std::max(top, position.y + render_size::edge(sy, size.y, source.height))};
+        int const y1{std::min(bottom, position.y + render_size::edge(sy + 1, size.y, source.height) - 1)};
+        for(int sx{first_x}; sx <= last_x;) {
+          auto const start{sx};
+          auto const colour{row[sx++]};
+          while(sx <= last_x && row[sx] == colour) ++sx;
+          if(!colour) continue;
+          int const x0{std::max(left, position.x + render_size::edge(start, size.x, source.width))};
+          int const x1{std::min(right, position.x + render_size::edge(sx, size.x, source.width) - 1)};
+          target.fill({x0, y0, x1, y1}, colour);
+        }
+      }
+      return;
+    }
     for(int y{top}; y <= bottom; ++y) {
       auto const row{static_cast<int64_t>(y - position.y) * source.height / size.y};
       for(int x{left}; x <= right; ++x) {

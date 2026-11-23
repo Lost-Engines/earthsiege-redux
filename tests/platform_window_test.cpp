@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
+#include "platform/viewport.h"
 #include "platform/window.h"
 #include "resources/artwork.h"
 
@@ -9,8 +10,55 @@ namespace {
 void require(bool value, char const *message) {
   if(!value) throw std::runtime_error{message};
 }
+
+void check_composite(earthsiege::window &display, earthsiege::render_size region) {
+  auto const canvas{display.resolution()};
+  auto const content{canvas.artwork_size()};
+  earthsiege::render_size const atlas_size{region.width + 17, region.height + 23};
+  std::vector<uint8_t> indices(atlas_size.count());
+  for(size_t i{0}; i < indices.size(); ++i) indices[i] = static_cast<uint8_t>(13 * i + i / atlas_size.width);
+  auto atlas{std::make_shared<earthsiege::framebuffer>(atlas_size, indices)};
+  earthsiege::framebuffer frame;
+  frame.attach(atlas, {7, 11, 7 + region.width - 1, 11 + region.height - 1});
+  frame.fill({42, 36, 198, 99}, 24);
+  frame.line(9, 172, 294, 110, 251);
+  earthsiege::palette colours;
+  for(unsigned i{0}; i < 256; ++i) colours.colours[i] = 0xff000000u | (i << 16) | ((255 - i) << 8) | (i ^ 99);
+  int w{}, h{};
+  glfwGetFramebufferSize(display.get(), &w, &h);
+  auto const view{earthsiege::viewport::fit(w, h, canvas)};
+  auto const check{[&] {
+    display.draw(frame, colours);
+    glReadBuffer(GL_BACK);
+    std::vector<std::array<uint8_t, 4>> pixels(static_cast<size_t>(w) * h);
+    glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    auto const reference{frame.resampled(content)};
+    for(int y{0}; y < h; ++y) {
+      for(int x{0}; x < w; ++x) {
+        uint32_t expected{0};
+        if(x >= view.x && x < view.x + view.width && y >= view.y && y < view.y + view.height) {
+          auto const sx{(2 * (x - view.x) + 1) * content.width / (2 * view.width)};
+          auto const sy{(2 * (y - view.y) + 1) * content.height / (2 * view.height)};
+          expected = colours.colours[reference.pixels()[sy * content.width + sx]] & 0xffffff;
+        }
+        auto const &rgb{pixels[(h - y - 1) * w + x]};
+        if(((uint32_t{rgb[0]} << 16) | (uint32_t{rgb[1]} << 8) | rgb[2]) != expected) {
+          throw std::runtime_error{"indexed display differs from CPU at " + std::to_string(x) + "," + std::to_string(y)
+            + " on " + std::to_string(canvas.width) + "x" + std::to_string(canvas.height)};
+        }
+      }
+    }
+  }};
+  check();
+  colours.colours[24] = 0xff31aec4;
+  check();
+  frame.fill(frame.size().bounds(), 24); // The lift door can cover the entire detailed image.
+  check();
+  frame.clear(251);
+  check();
 }
-int main() try {
+
+void check_window() {
   earthsiege::window display{2};
   auto *handle{display.get()};
   earthsiege::window_event event;
@@ -78,9 +126,17 @@ int main() try {
   require(pixel == std::array<uint8_t, 3>{0xed, 0xcb, 0xa9}, "individual rendered pixel after resize");
   glReadPixels(art.left + 101, h - 1 - art.top - 100, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel.data());
   require(pixel == std::array<uint8_t, 3>{0x12, 0x34, 0x56}, "adjacent output pixel remains independent");
+  check_composite(display, size);
   glfwSetWindowShouldClose(handle, GLFW_TRUE);
   while(display.poll(event) && event.type != earthsiege::event_type::close) {}
   require(event.type == earthsiege::event_type::close, "close survives nested dialog consumption");
+}
+}
+
+int main() try {
+  check_window();
+  earthsiege::window fixed{2, earthsiege::render_size{731, 413}};
+  check_composite(fixed, {417, 277});
   std::cout << "GLFW events and OpenGL framebuffer checks pass\n";
 } catch(std::exception const &error) {
   std::cerr << error.what() << '\n';

@@ -14,6 +14,12 @@ framebuffer::framebuffer(render_size size, std::span<uint8_t const> pixels)
   if(size.count() != raster.size()) throw std::invalid_argument{"framebuffer dimensions differ from pixel count"};
 }
 
+indexed_region framebuffer::detail_region() const {
+  if(!detail) return {{0, 0}, 0, nullptr};
+  auto const stride{detail->extent.width};
+  return {detail_size(), stride, detail->raster.data() + static_cast<size_t>(detail_area.top) * stride + detail_area.left};
+}
+
 void framebuffer::attach(std::shared_ptr<framebuffer const> image, rectangle area, screen_mask const *window) {
   detail = std::move(image);
   detail_area = area;
@@ -51,21 +57,55 @@ void framebuffer::blit_to(framebuffer &dest, rectangle area) const {
   int const left{std::max(0, area.left)}, top{std::max(0, area.top)};
   int const right{std::min(dest.extent.width - 1, area.right)}, bottom{std::min(dest.extent.height - 1, area.bottom)};
   if(right < left || bottom < top) return;
-  std::vector<int> xs(right - left + 1), detail_x(detail ? xs.size() : 0);
+  int const width{right - left + 1};
+  bool const direct{detail && detail_area.width() == area.width() && detail_area.height() == area.height()};
+  std::vector<int> xs(width), detail_x(detail && !direct ? width : 0);
   for(int x{left}; x <= right; ++x) {
     xs[x - left] = static_cast<int>(int64_t{x - area.left} * extent.width / area.width());
-    if(detail) detail_x[x - left] = detail_area.left + static_cast<int>(int64_t{x - area.left} * detail_area.width() / area.width());
+    if(!detail_x.empty()) detail_x[x - left] = detail_area.left + static_cast<int>(int64_t{x - area.left} * detail_area.width() / area.width());
   }
+  std::vector<scanline_span> spans;
+  int previous_y{-1};
   for(int y{top}; y <= bottom; ++y) {
-    auto const row{int64_t{y - area.top} * extent.height / area.height() * extent.width};
+    auto const sy{static_cast<int>(int64_t{y - area.top} * extent.height / area.height())};
+    auto const row{static_cast<size_t>(sy) * extent.width};
     auto *dst{dest.raster.data() + static_cast<size_t>(y) * dest.extent.width + left};
-    if(detail) {
-      auto const sy{detail_area.top + int64_t{y - area.top} * detail_area.height() / area.height()};
-      auto const *hi{detail->raster.data() + sy * detail->extent.width};
-      for(size_t i{0}; i < xs.size(); ++i) dst[i] = visible[row + xs[i]] ? hi[detail_x[i]] : raster[row + xs[i]];
-    } else {
-      for(size_t i{0}; i < xs.size(); ++i) dst[i] = raster[row + xs[i]];
+    if(!detail_x.empty()) {
+      auto const dy{detail_area.top + int64_t{y - area.top} * detail_area.height() / area.height()};
+      auto const *hi{detail->raster.data() + dy * detail->extent.width};
+      for(int i{0}; i < width; ++i) dst[i] = visible[row + xs[i]] ? hi[detail_x[i]] : raster[row + xs[i]];
+      continue;
     }
+    if(sy != previous_y && direct) {
+      // All output rows in one cockpit scanline share the same HUD mask.
+      spans.clear();
+      for(int x{xs.front()}; x <= xs.back();) {
+        if(!visible[row + x]) {
+          ++x;
+          continue;
+        }
+        auto const first{x};
+        do { ++x; } while(x <= xs.back() && visible[row + x]);
+        auto const offset{area.left - left};
+        int const start{std::max(0, offset + render_size::edge(first, area.width(), extent.width))};
+        int const end{std::min(width, offset + render_size::edge(x, area.width(), extent.width))};
+        if(end > start) spans.push_back({start, end - 1});
+      }
+    }
+    bool const all_world{spans.size() == 1 && spans.front().left == 0 && spans.front().right == width - 1};
+    if(!all_world) {
+      if(sy == previous_y) {
+        std::copy_n(dst - dest.extent.width, width, dst);
+      } else {
+        for(int i{0}; i < width; ++i) dst[i] = raster[row + xs[i]];
+      }
+    }
+    if(direct) {
+      auto const dy{detail_area.top + y - area.top};
+      auto const *hi{detail->raster.data() + static_cast<size_t>(dy) * detail->extent.width + detail_area.left + (left - area.left)};
+      for(auto const span : spans) std::copy_n(hi + span.left, span.right - span.left + 1, dst + span.left);
+    }
+    previous_y = sy;
   }
 }
 
@@ -147,6 +187,15 @@ void framebuffer::pixel(int x, int y, uint8_t colour) {
     raster[i] = colour;
     if(detail) visible[i] = 0;
   }
+}
+
+std::span<uint8_t> framebuffer::opaque_span(int y, int left, int right) {
+  if(pixel_mask || y < 0 || y >= extent.height || left < 0 || right >= extent.width || left > right)
+    throw std::invalid_argument{"opaque span must be inside an unmasked raster"};
+  auto const first{static_cast<size_t>(y) * extent.width + left};
+  auto const count{static_cast<size_t>(right - left + 1)};
+  if(detail) std::fill_n(visible.begin() + first, count, 0);
+  return std::span{raster}.subspan(first, count);
 }
 
 void framebuffer::fill(rectangle area, uint8_t colour) {

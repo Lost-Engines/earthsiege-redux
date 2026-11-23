@@ -5,7 +5,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 #include <GLFW/glfw3.h>
 #include "render/framebuffer.h"
 
@@ -13,6 +12,7 @@ namespace earthsiege {
 
 struct palette;
 class software_cursor;
+class indexed_display;
 
 enum class event_type {
   close,
@@ -46,13 +46,10 @@ struct glfw_context {
 class window {
   glfw_context context;
   std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> handle{nullptr, glfwDestroyWindow};
-  unsigned int texture{0};
+  std::unique_ptr<indexed_display> presenter;
   int max_texture_size{0};
-  render_size texture_size{0, 0};
   std::optional<render_size> fixed_resolution;
   mutable render_size last_drawable{};
-  framebuffer resolved;
-  std::vector<std::array<uint8_t, 4>> display;
   std::deque<window_event> events;
   static auto self(GLFWwindow *handle)->window &;
   auto logical_position(double x, double y) const->std::array<int, 2>;
