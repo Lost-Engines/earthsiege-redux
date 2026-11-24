@@ -34,7 +34,7 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 
 - The 3D world and briefing map render at your window's resolution. The cockpit and menus keep their original pixel art.
 - Models stay detailed and visible ten times farther away by default. You can adjust detail and draw distance independently.
-- Fog fades textures, dark gun barrels and muzzle flashes along with the rest of a distant model.
+- Fog fades textures, dark gun barrels and muzzle flashes on distant models. HERC shadows fade with the machines that cast them.
 - Hits can throw more debris. You can change how many pieces fly off and how many can be in the air at once.
 - Both campaigns start on the cockpit scanner and use the expansion's shield gauge, which goes dark when empty and lights up in stages as it recharges.
 - The tactical map fits the mission area. You can give attack and defend orders beyond scanner range.

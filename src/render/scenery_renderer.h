@@ -39,6 +39,7 @@ struct ground_flash {
   vec3<int32_t> &position;
   uint16_t heading{0};
   std::span<bitmap const> textures;
+  vec3<int32_t> const *shadow_caster{nullptr};
 };
 
 /// Render owned scenery with the original distance ramps and whole-scene painter tree

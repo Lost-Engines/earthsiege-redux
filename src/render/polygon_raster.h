@@ -4,6 +4,7 @@
 #include <vector>
 #include "vectorstorm/vector/vector2.h"
 #include "render/framebuffer.h"
+#include "render/palette_shading.h"
 
 namespace earthsiege {
 
@@ -24,6 +25,6 @@ enum class polygon_winding {
   preserve,
 };
 
-void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> points, rectangle bounds, uint8_t colour, polygon_winding winding = polygon_winding::detect);
+void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> points, rectangle bounds, uint8_t colour, polygon_winding winding = polygon_winding::detect, palette_ink_map const *ground_blend = nullptr);
 
 } // namespace earthsiege

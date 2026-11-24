@@ -6,6 +6,7 @@
 #include "resources/resource_store.h"
 #include "simulation/ground_actor.h"
 #include "simulation/herc_body.h"
+#include "simulation/world_effects.h"
 
 namespace {
 using namespace earthsiege;
@@ -140,6 +141,55 @@ void check_weapon_fog(resource_store const &resources, ground_catalogue const &c
   check_far(enemy, edges.back());
   if(draw(enemy, 10000) != close) throw std::runtime_error{"HERC did not recover its close colours"};
 }
+void check_shadow_fog(resource_store const &resources, terrain_kind terrain, int16_t palette_variant = 0) {
+  scenery_world world{resources, {.terrain{terrain}, .zone{-1}, .palette_variant{palette_variant}}};
+  auto const &env{world.environment()};
+  auto const &edges{env.distance_bands[0]};
+  auto const &colours{world.colours().dac_colours};
+  bool const alternate{env.atmosphere_parameters[1] != 0};
+  world_effects effects{resources, {}, alternate};
+  framebuffer frame;
+  scenery_renderer renderer{frame, world, read_distance_shade_bindings(resources.read("simvol0", "dat/SHADES.DAT")), scene_shading::distance, 10.0};
+  model_view view;
+  view.projection.perspective_shift = 0;
+  view.projection.orthographic_divisor = 4000;
+  frame.clear(static_cast<uint8_t>(env.background.ground_palette_start));
+  frame.fill({160, 0, 319, 199}, static_cast<uint8_t>(env.background.ground_palette_start + env.background.ground_bands - 1));
+  auto const ground{frame};
+  vec3<int32_t> caster{};
+  vec3<int32_t> foot{100, 200, 0};
+  auto const draw{[&](ground_flash const &mark, int height) {
+    frame = ground;
+    renderer.draw({0, 0, height}, {49152, 0, 0}, {}, false, {}, nullptr, {&mark, 1}, view);
+    return frame.pixels();
+  }};
+
+  for(size_t shape : {0u, 2u}) {
+    auto const shadow{effects.ground_attachment(shape, foot, 0, &caster)};
+    auto const close{draw(shadow, 10000)};
+    uint8_t const ink{static_cast<uint8_t>(alternate ? 224 : 240)};
+    auto const pixel{std::ranges::find(close, ink)};
+    if(pixel == close.end()) throw std::runtime_error{"missing authored shadow at close range"};
+    if(draw(shadow, edges.front() - 1) != close) throw std::runtime_error{"foot entered fog before its HERC"};
+    auto const middle{draw(shadow, edges[edges.size() / 2 - 1])};
+    if(middle == close || middle == ground.pixels()) throw std::runtime_error{"missing partial shadow"};
+    for(size_t i{0}; i < middle.size(); ++i) {
+      auto const &surface{colours[ground.pixels()[i]]};
+      auto const &near{colours[close[i]]};
+      auto const &faded{colours[middle[i]]};
+      for(size_t channel{0}; channel < faded.size(); ++channel) {
+        if(faded[channel] < std::min(near[channel], surface[channel]) || faded[channel] > surface[channel])
+          throw std::runtime_error{"partial shadow overshot its underlying ground colour"};
+      }
+    }
+    if(draw(shadow, edges[edges.size() - 2]) != ground.pixels() || draw(shadow, edges.back() + 10000) != ground.pixels())
+      throw std::runtime_error{"fully fogged shadow covered the ground"};
+    if(draw(shadow, 10000) != close) throw std::runtime_error{"returning shadow lost its near colour"};
+  }
+  auto const flash{effects.ground_attachment(1, foot, 0)};
+  auto const flash_near{draw(flash, 10000)};
+  if(flash_near == ground.pixels() || draw(flash, edges.back()) != flash_near) throw std::runtime_error{"ground flash picked up shadow fog"};
+}
 } // namespace
 
 int main(int argc, char **argv) try {
@@ -149,6 +199,10 @@ int main(int argc, char **argv) try {
   check_listening_post(resources, catalogue, earthsiege::terrain_kind::desert, 0);
   check_listening_post(resources, catalogue, earthsiege::terrain_kind::desert, 1);
   check_weapon_fog(resources, catalogue);
+  check_shadow_fog(resources, earthsiege::terrain_kind::urban);
+  check_shadow_fog(resources, earthsiege::terrain_kind::desert);
+  check_shadow_fog(resources, earthsiege::terrain_kind::temperate, 2);
+  check_shadow_fog(resources, earthsiege::terrain_kind::ice, 1);
   if(resources.edition() == earthsiege::game_edition::expansion) check_listening_post(resources, catalogue, earthsiege::terrain_kind::ruins, 1);
   return EXIT_SUCCESS;
 } catch(std::exception const &error) {

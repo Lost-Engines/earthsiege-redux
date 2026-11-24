@@ -57,6 +57,7 @@ struct surface_colours {
   palette const &authored;
   texture_shade_maps const &textures;
   model_fog_band const *fog;
+  palette_ink_map const *ground_blend;
 
   struct material_ramp {
     std::span<uint16_t const> inks;
@@ -124,14 +125,14 @@ class model_draw {
     std::vector<vec2<int32_t>> points;
     points.reserve(vertices.size());
     for(auto const &vertex : vertices) points.push_back(vertex.position);
-    if(points.size() == 1) {
+    if(!outline && (points.size() >= 3 || colours.ground_blend)) {
+      draw_solid_polygon(target, points, view.bounds, colour, polygon_winding::preserve, colours.ground_blend);
+    } else if(points.size() == 1) {
       if(view.bounds.contains(points[0].x, points[0].y)) target.pixel(points[0].x, points[0].y, colour);
-    } else if(points.size() == 2 || outline) {
+    } else {
       auto const raster{target.clip() ? line_raster_mode::clip_regions : line_raster_mode::direct};
       for(size_t index{1}; index < points.size(); ++index) draw_model_line(target, vec2<int32_t>{points[index]}, vec2<int32_t>{points[index - 1]}, view.bounds, colour, raster);
       if(points.size() > 2) draw_model_line(target, vec2<int32_t>{points[0]}, vec2<int32_t>{points.back()}, view.bounds, colour, raster);
-    } else {
-      draw_solid_polygon(target, points, view.bounds, colour, polygon_winding::preserve);
     }
   }
 
@@ -343,13 +344,13 @@ model_renderer::model_renderer(framebuffer &buffer, palette const &palette_data,
     texture_shades{make_texture_shades(palette_data)} {
 }
 
-void model_renderer::draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> const textures, std::span<light const> const lights, std::span<model_attachment const> const attachments, model_fog_band const *const fog) {
+void model_renderer::draw(model_part const &source, model_instance const &instance, model_transform const &object, model_view const &view, std::span<bitmap const> const textures, std::span<light const> const lights, std::span<model_attachment const> const attachments, model_fog_band const *const fog, palette_ink_map const *const ground_blend) {
   if(view.cull_bounds && !classify_model_bounds(source.header, compose_transforms(object, view.camera), view.projection, view.bounds, false)) return;
   auto raster_view{view};
   raster_view.projection.output = target.size();
   raster_view.bounds = target.size().from_logical(view.bounds);
   model_light_cache cache{lights, object, instance.transforms().size()};
-  surface_colours const paints{colours, authored_colours, fog ? fog->textures : texture_shades, fog};
+  surface_colours const paints{colours, authored_colours, fog ? fog->textures : texture_shades, fog, ground_blend};
   model_draw{target, paints, instance, object, raster_view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);
 }
 

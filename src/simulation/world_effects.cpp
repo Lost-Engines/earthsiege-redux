@@ -223,8 +223,8 @@ void world_effects::append_models(std::vector<scene_model> &models) {
     });
   });
 }
-ground_flash world_effects::ground_attachment(size_t const shape, vec3<int32_t> &position, uint16_t const heading) {
-  return {flat_models.roots.at(shape), flat_instances.at(shape), position, heading, flat_textures};
+ground_flash world_effects::ground_attachment(size_t const shape, vec3<int32_t> &position, uint16_t const heading, vec3<int32_t> const *const shadow_caster) {
+  return {flat_models.roots.at(shape), flat_instances.at(shape), position, heading, flat_textures, shadow_caster};
 }
 std::vector<ground_flash> world_effects::ground_flashes() {
   std::vector<ground_flash> result;

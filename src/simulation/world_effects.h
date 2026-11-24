@@ -103,7 +103,7 @@ public:
   /// Draw views stay valid until the next simulation update or collection.
   void append_models(std::vector<scene_model> &models);
   std::vector<ground_flash> ground_flashes();
-  ground_flash ground_attachment(size_t shape, vec3<int32_t> &position, uint16_t heading);
+  ground_flash ground_attachment(size_t shape, vec3<int32_t> &position, uint16_t heading, vec3<int32_t> const *shadow_caster = nullptr);
   object_pool<live_smoke_puff> const &live_smoke() const;
   object_pool<live_smoke_emitter> const &smoke_controllers() const;
   object_pool<live_explosion> const &live_explosions() const;

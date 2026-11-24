@@ -42,14 +42,26 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
   camera.translation = position;
   world_to_camera = inverse_transform(camera);
   view.camera = world_to_camera;
-  for(auto const &flash : ground) {
+  auto const camera_distance{[&position](vec3<int32_t> const &origin) {
     vec3<int32_t> delta;
-    for(unsigned int axis{0}; axis != 3; ++axis) delta[axis] = wrap_long(static_cast<int64_t>(flash.position[axis]) - position[axis]);
-    if(fast_distance(delta) >= ground_flash_cutoff) continue;
+    for(unsigned int axis{0}; axis != 3; ++axis) delta[axis] = wrap_long(static_cast<int64_t>(origin[axis]) - position[axis]);
+    return fast_distance(delta);
+  }};
+  auto const shadow_bands{shading.shadow_fog()};
+  for(auto const &flash : ground) {
+    if(camera_distance(flash.position) >= ground_flash_cutoff) continue;
     flash.position.z = 0;
+    palette_ink_map const *ground_blend{nullptr};
+    if(flash.shadow_caster && !shadow_bands.empty()) {
+      constexpr int16_t herc_class{7};
+      auto const level{shading.band(std::max(0, camera_distance(*flash.shadow_caster)), herc_class, 0)};
+      // At full fog the shadow has no contrast with the ground beneath it.
+      if(level && level + 1 == shadow_bands.size()) continue;
+      if(level) ground_blend = &shadow_bands.at(level);
+    }
     auto placement{rotation_transform({0, 0, flash.heading})};
     placement.translation = flash.position;
-    models.draw(flash.root, flash.instance, placement, view, flash.textures, dynamic ? dynamic->current() : lights);
+    models.draw(flash.root, flash.instance, placement, view, flash.textures, dynamic ? dynamic->current() : lights, {}, nullptr, ground_blend);
   }
   std::vector<scene_order_entry> entries;
   std::vector<size_t> indices;
@@ -60,9 +72,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
     auto const &object{objects[index]};
     auto const &origin{object.placement.translation};
     if(origin.z < 0) continue;
-    vec3<int32_t> delta;
-    for(unsigned int axis{0}; axis != 3; ++axis) delta[axis] = wrap_long(static_cast<int64_t>(origin[axis]) - position[axis]);
-    auto const distance{fast_distance(delta)};
+    auto const distance{camera_distance(origin)};
     auto const radius{world.terrain().roots.at(object.shape).header.radius};
     if(shading.culled(distance, 0, radius)) continue;
     scene_order_entry entry{
@@ -86,9 +96,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
     auto const radius{model ? model->roots.front().header.radius : int16_t{0}};
     auto const native_class{model ? model->native_class : int16_t{3}};
     if(origin.z < 0) continue;
-    vec3<int32_t> delta;
-    for(unsigned int axis{0}; axis != 3; ++axis) delta[axis] = wrap_long(static_cast<int64_t>(origin[axis]) - position[axis]);
-    auto const distance{fast_distance(delta)};
+    auto const distance{camera_distance(origin)};
     if(shading.culled(distance, native_class, radius)) continue;
     entries.push_back({
       .position{vec3<int32_t>{origin}},

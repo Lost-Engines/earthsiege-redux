@@ -95,6 +95,47 @@ std::vector<palette_ink_map> fog_column(palette const &colours, std::vector<pale
   return result;
 }
 
+// Each entry blends the original FLAT/FLAT2 shadow into a pixel already on
+// the ground. A dark patch of terrain can show through even in partial fog.
+std::vector<palette_ink_map> ground_shadow_bands(world_environment const &env, palette const &colours) {
+  int const last{env.shade_levels - 1};
+  int const ink{env.atmosphere_parameters[1] ? 224 : 240};
+  auto const &shadow{colours.dac_colours[ink]};
+  std::vector<palette_ink_map> result(static_cast<size_t>(env.shade_levels));
+  result.front().fill(static_cast<uint8_t>(ink));
+  for(int ground{0}; ground < 256; ++ground) {
+    auto const &surface{colours.dac_colours[ground]};
+    for(int level{1}; level <= last; ++level) {
+      // Compare palette swatches with the unrounded blend. Constrain each
+      // channel so no swatch can brighten the ground or deepen the shadow.
+      auto const error{[&](int swatch) -> int64_t {
+        int64_t sum{};
+        for(size_t ch{0}; ch < surface.size(); ++ch) {
+          int const shade{std::max(0, surface[ch] - shadow[ch])};
+          int const actual{surface[ch] - colours.dac_colours[swatch][ch]};
+          if(actual < 0 || actual > shade) return std::numeric_limits<int64_t>::max();
+          int64_t const delta{static_cast<int64_t>(actual) * last - static_cast<int64_t>(shade) * (last - level)};
+          sum += delta * delta;
+        }
+        return sum;
+      }};
+      int best{ground};
+      auto best_error{error(best)};
+      for(int bank : {ink & 0xf0, ground & 0xf0}) {
+        for(int swatch{bank}; swatch < bank + 16 && best_error; ++swatch) {
+          auto const difference{error(swatch)};
+          if(difference < best_error) {
+            best = swatch;
+            best_error = difference;
+          }
+        }
+      }
+      result[level][ground] = static_cast<uint8_t>(best);
+    }
+  }
+  return result;
+}
+
 } // anonymous namespace
 
 distance_shade_bindings read_distance_shade_bindings(bytes const source) {
@@ -138,6 +179,7 @@ distance_shading::distance_shading(world_environment const &source, distance_sha
 }
 
 void distance_shading::prepare_model_shades(palette const &colours, texture_shade_maps const &lighting) {
+  shadow_bands = ground_shadow_bands(environment, colours);
   std::array<bool, 256> used{};
   for(auto const &column : bands) {
     for(auto const range : column) {

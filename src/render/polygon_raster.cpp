@@ -130,7 +130,7 @@ polygon_edges make_polygon_edges(std::span<vec2<int32_t> const> const points) {
   return result;
 }
 
-static void draw_region(framebuffer &target, std::span<vec2<int32_t> const> const points, rectangle const bounds, uint8_t const colour, polygon_winding const winding, screen_region const *region) {
+static void draw_region(framebuffer &target, std::span<vec2<int32_t> const> const points, rectangle const bounds, uint8_t const colour, polygon_winding const winding, screen_region const *region, palette_ink_map const *ground_blend) {
   auto clipped{clip_polygon_rectangle(points, bounds)};
   if(clipped.empty()) return;
   int64_t area{0};
@@ -153,15 +153,19 @@ static void draw_region(framebuffer &target, std::span<vec2<int32_t> const> cons
       left = std::max(left, cutout.left);
       right = std::min(right, cutout.right);
     }
-    if(left <= right) target.fill({left, y, right, y}, colour);
+    if(left > right) continue;
+    if(ground_blend) {
+      size_t const offset{static_cast<size_t>(y) * target.size().width};
+      for(int x{left}; x <= right; ++x) target.pixel(x, y, (*ground_blend)[target.pixels()[offset + x]]);
+    } else target.fill({left, y, right, y}, colour);
   }
 }
 
-void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> points, rectangle bounds, uint8_t colour, polygon_winding winding) {
-  if(target.size() != render_size{}) bounds = bounds.intersect(target.size().bounds());
+void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> points, rectangle bounds, uint8_t colour, polygon_winding winding, palette_ink_map const *ground_blend) {
+  if(ground_blend || target.size() != render_size{}) bounds = bounds.intersect(target.size().bounds());
   auto const *mask{target.raster_clip()};
   if(!mask) {
-    draw_region(target, points, bounds, colour, winding, nullptr);
+    draw_region(target, points, bounds, colour, winding, nullptr, ground_blend);
     return;
   }
   // The original rectangle regions clip geometry before building the edge table;
@@ -174,7 +178,7 @@ void draw_solid_polygon(framebuffer &target, std::span<vec2<int32_t> const> poin
       limits.left = std::max(limits.left, region.spans.front().left);
       limits.right = std::min(limits.right, region.spans.front().right);
     }
-    draw_region(target, points, limits, colour, winding, &region);
+    draw_region(target, points, limits, colour, winding, &region, ground_blend);
   }
 }
 

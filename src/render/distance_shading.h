@@ -1,6 +1,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <span>
 #include <vector>
 #include "render/palette_shading.h"
 #include "resources/world.h"
@@ -22,6 +23,7 @@ class distance_shading {
   std::vector<std::vector<palette_range>> bands;
   std::vector<palette_range> highlights;
   std::vector<std::vector<model_fog_band>> model_bands;
+  std::vector<palette_ink_map> shadow_bands;
   int64_t terrain_cutoff;
   int64_t actor_cutoff;
   std::array<int64_t, 2> ground_target_cutoffs;
@@ -31,6 +33,7 @@ public:
   void prepare_model_shades(palette const &colours, texture_shade_maps const &lighting);
   size_t band(int32_t distance, int16_t native_class, int16_t radius) const;
   bool culled(int32_t distance, int16_t native_class, int16_t radius) const;
+  std::span<palette_ink_map const> shadow_fog() const { return shadow_bands; }
   // Set the authored material ramps and return fog for other model colours.
   model_fog_band const *apply(palette &target, int32_t distance, int16_t native_class, int16_t radius, bool split_highlights = false) const;
 };

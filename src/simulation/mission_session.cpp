@@ -508,7 +508,7 @@ std::vector<ground_flash> mission_session::ground_models() {
     for(auto &attachment : member.actor->ground_attachments()) {
       if(attachment.active) {
         result.push_back(effects.ground_attachment(
-          static_cast<size_t>(attachment.shape), attachment.position, attachment.heading));
+          static_cast<size_t>(attachment.shape), attachment.position, attachment.heading, &member.actor->body().movement().position));
       }
     }
   }
