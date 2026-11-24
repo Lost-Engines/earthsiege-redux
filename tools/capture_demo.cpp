@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <charconv>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -18,7 +20,14 @@
 using namespace earthsiege;
 
 int main(int argc, char **argv) try {
-  if(argc != 6) throw std::runtime_error{"Usage: capture_demo ASSETS DEMO PREFS.CFG MUSIC_DEVICE SCRATCH_DIR > frames.pal8"};
+  if(argc != 6 && argc != 7) throw std::runtime_error{"Usage: capture_demo ASSETS DEMO PREFS.CFG MUSIC_DEVICE SCRATCH_DIR [SCALE] > frames.pal8"};
+  int scale{1};
+  if(argc == 7) {
+    std::string_view const value{argv[6]};
+    auto const [end, error]{std::from_chars(value.data(), value.data() + value.size(), scale)};
+    if(error != std::errc{} || end != value.data() + value.size() || scale < 1 || scale > 32767 / 320)
+      throw std::runtime_error{"SCALE must be a positive integer with output dimensions no larger than 32767"};
+  }
 #ifdef _WIN32
   if(_setmode(_fileno(stdout), _O_BINARY) == -1) throw std::runtime_error{"Cannot open binary video output"};
 #endif
@@ -31,6 +40,9 @@ int main(int argc, char **argv) try {
   std::filesystem::path const scratch{argv[5]};
   std::filesystem::create_directories(scratch);
   demo_playback replay{resources, static_cast<unsigned>(std::stoul(argv[2])), prefs, scratch / "saves", music};
+  render_size const size{320 * scale, 200 * scale};
+  replay.view().render_resolution(size);
+  framebuffer output{size};
   std::ofstream audio{scratch / "stereo.s16le", std::ios::binary};
   audio.exceptions(std::ios::badbit | std::ios::failbit);
   uint64_t time_ms{0}, video_frames{0};
@@ -45,9 +57,11 @@ int main(int argc, char **argv) try {
       std::array<uint32_t, 256> palette;
       std::ranges::transform(replay.view().colours().colours, palette.begin(), [](uint32_t rgb){return rgb | 0xff000000u;});
       auto const emit_until{[&](framebuffer const &surface, uint64_t end_ms) {
+        if(video_frames * 1000 >= end_ms * vga_refresh_hz) return;
+        if(scale != 1) surface.blit_presentation(output, size.bounds());
+        auto const &pixels{scale == 1 ? surface.pixels() : output.pixels()};
         // FFmpeg PAL8 carries a fresh native-endian ARGB palette after every raster.
         while(video_frames * 1000 < end_ms * vga_refresh_hz) {
-          auto const &pixels{surface.pixels()};
           std::cout.write(reinterpret_cast<char const *>(pixels.data()), pixels.size());
           std::cout.write(reinterpret_cast<char const *>(palette.data()), sizeof(palette));
           ++video_frames;

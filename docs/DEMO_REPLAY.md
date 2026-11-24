@@ -43,15 +43,16 @@ of entries, retrying if it matches the selector's retained previous index.
 
 ## Recording a demo
 
-From the sibling `earthsiege-reverse` checkout, run
-`python3 tools/record_demo.py 2` to make separate DOSBox and C++ recordings
-of retail DEMO2. Add `--source cpp` to record only this version or
-`--edition expansion` to select the expansion tapes. The files are written
-under `work/videos` in the analysis checkout.
+From the sibling `earthsiege-reverse` checkout, record retail demo 2 at
+1920×1200 with `python3 tools/record_demo.py 2 --source redux --scale 6`.
+Choose a demo from 1 to 4. Add `--edition expansion` for the expansion tapes
+and `--output DIRECTORY` to choose where the Matroska file goes. The default
+destination is under `work/videos` in the analysis checkout.
 
 The harness builds the optional `capture_demo` target. It runs the same
-replay as View Demo, samples the 320 by 200 framebuffer and its palette at
-70 Hz, and writes stereo samples from the game mixer. It includes the
+replay as View Demo and renders the 3D scene at the chosen scale. Scale 1
+is 320×200. The file contains lossless RGB video at 70 Hz and stereo FLAC
+audio from the game mixer. It includes the
 intermediate frames during cockpit pans and the clean page shown between
 mouse cursor flashes. The tape clock sets the timing, so recording can run
 with the game window closed.
