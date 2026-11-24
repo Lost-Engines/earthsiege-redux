@@ -33,7 +33,7 @@ void check_composite(earthsiege::window &display, earthsiege::render_size region
     display.draw(frame, colours, cursor);
     auto const pointer{display.pointer_position()};
     auto const ink_area{cursor ? cursor->bounds(pointer[0], pointer[1]) : earthsiege::rectangle{}};
-    auto const panel{content.cockpit_panel(frame.cockpit_pan())};
+    auto const panel{content.cockpit_panel(frame.cockpit_viewport())};
     glReadBuffer(GL_BACK);
     std::vector<std::array<uint8_t, 4>> pixels(static_cast<size_t>(w) * h);
     glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
@@ -48,7 +48,7 @@ void check_composite(earthsiege::window &display, earthsiege::render_size region
           auto index{reference.pixels()[sy * content.width + sx]};
           if(cursor) {
             int const lx{static_cast<int>(std::floor((sx - panel.left) * 320. / panel.width()))};
-            int const ly{sy * 200 / panel.height()};
+            int const ly{static_cast<int>(std::floor((sy - panel.top) * 200. / panel.height()))};
             if(ink_area.contains(lx, ly)) {
               auto const ink{cursor->artwork().pixels[(ly - ink_area.top) * ink_area.width() + lx - ink_area.left]};
               if(ink) index = ink;
@@ -77,10 +77,24 @@ void check_composite(earthsiege::window &display, earthsiege::render_size region
     frame.attach(atlas, {7, 11, 7 + region.width - 1, 11 + region.height - 1});
     frame.fill({147, 13, 159, 77}, 24);
     for(int pan : {0, -320, 160, 320}) {
-      frame.set_surround(sides, {3, 0, 452, 199}, pan);
+      frame.set_surround(sides, {3, 0, 452, 199}, {.pan = pan});
       check();
     }
+    frame.set_surround(sides, {3, 0, 452, 199}, {.pan = -160, .down = 80, .scale = .625, .lower = 197});
+    check();
+    frame.attach(sides, {92, 13, 299, 144});
+    frame.fill({27, 50, 112, 172}, 24);
+    require(frame.shares_surround_detail(), "combined world and cockpit upload");
+    check();
     if(arrow && glfwGetPlatform() == GLFW_PLATFORM_X11) {
+      glfwFocusWindow(display.get());
+      for(int y : {-15, 100, 210}) {
+        display.warp_mouse(160, y);
+        glfwPollEvents();
+        auto const p{display.pointer_position()};
+        require(std::abs(p[0] - 160) <= 1 && std::abs(p[1] - y) <= 1, "zoomed cockpit cursor round trip");
+        check(arrow);
+      }
       frame.set_surround(sides, {3, 0, 452, 199});
       check();
       glfwFocusWindow(display.get());

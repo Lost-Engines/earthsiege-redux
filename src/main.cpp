@@ -117,7 +117,8 @@ auto main(int argc, char *argv[])->int try {
         "  --soundfont PATH      SoundFont for the General MIDI music option\n"
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
-        "  --fov DEGREES         Horizontal field of view across the original cockpit (10-170, default 64.01)\n"
+        "  --fov DEGREES         Horizontal field of view at 16:10 (10-170, default 64.01)\n"
+        "                        Wider angles pull back the cockpit and instruments\n"
         "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 10, higher keeps detail farther away)\n"
         "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 10)\n"
         "  --fragment-pool-size N       Maximum airborne fragments and detached weapons (default: 600)\n"
@@ -257,6 +258,7 @@ auto main(int argc, char *argv[])->int try {
   std::unique_ptr<earthsiege::mission_alert> alert;
   std::unique_ptr<earthsiege::mission_options_dialog> options;
   earthsiege::framebuffer alert_frame;
+  std::optional<earthsiege::framebuffer> alert_backdrop;
   earthsiege::framebuffer menu_frame;
   std::unique_ptr<earthsiege::mission_view> scene;
   if(inspect_demo) {
@@ -318,6 +320,7 @@ auto main(int argc, char *argv[])->int try {
     int const message{alert->message()};
     bool const ending{alert->exits_mission(response)};
     alert.reset();
+    alert_backdrop.reset();
     if(message == 1 && response == 1) {
       running = false;
       return;
@@ -325,6 +328,11 @@ auto main(int argc, char *argv[])->int try {
     // The callback may be inside step_player. Release the scene only after
     // that original partial-frame exit has unwound to the host loop.
     if(scene && message > 1 && ending) leave_mission = true;
+  }};
+  auto const draw_alert{[&]{
+    if(!alert_backdrop) alert_backdrop = scene ? scene->image().dialog_backdrop() : menu_frame;
+    alert_frame = *alert_backdrop;
+    alert->draw(alert_frame);
   }};
   auto const poll_events{[&]{
     // Leave subsequent host events queued until the mission has reached its
@@ -494,6 +502,8 @@ auto main(int argc, char *argv[])->int try {
   // advance until its response is known.
   auto const run_modal{[&]{
     auto const saved_mouse{display->pointer_position()};
+    auto const saved_framing{scene->image().cockpit_viewport()};
+    display->pointer_framing({});
     while(running && (alert || options)) {
       scene->render_resolution(render_resolution());
       poll_events();
@@ -512,10 +522,10 @@ auto main(int argc, char *argv[])->int try {
           scene_dirty = false;
         }
       }
-      alert_frame = scene->image();
       if(alert) {
-        alert->draw(alert_frame);
+        draw_alert();
       } else {
+        alert_frame = scene->image();
         options->draw(alert_frame);
       }
       display->present(alert_frame, scene->colours(), cursor_image());
@@ -524,7 +534,10 @@ auto main(int argc, char *argv[])->int try {
 #endif
       sleep_milliseconds(8);
     }
-    if(running && !leave_mission) display->warp_mouse(saved_mouse[0], saved_mouse[1]);
+    if(running && !leave_mission) {
+      display->pointer_framing(saved_framing);
+      display->warp_mouse(saved_mouse[0], saved_mouse[1]);
+    }
     return !running || leave_mission;
   }};
   earthsiege::mission_dialog_handlers const dialogs{
@@ -731,10 +744,7 @@ auto main(int argc, char *argv[])->int try {
       }
       menu.draw(menu_frame, render_resolution(), distances.lod);
     }
-    if(alert) {
-      alert_frame = scene ? scene->image() : menu_frame;
-      alert->draw(alert_frame);
-    }
+    if(alert) draw_alert();
     if(options) {
       alert_frame = scene->image();
       options->draw(alert_frame);

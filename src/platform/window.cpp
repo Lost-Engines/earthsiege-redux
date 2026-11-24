@@ -140,12 +140,12 @@ void window::draw(framebuffer const &frame, palette const &colours, software_cur
   glfwGetFramebufferSize(handle.get(), &width, &height);
   if(width <= 0 || height <= 0) return;
   auto const canvas{resolution()};
-  cockpit_pan = frame.cockpit_pan();
+  framing = frame.cockpit_viewport();
   auto const area{viewport::fit(width, height, canvas, frame.has_surround())};
   std::array<int, 2> position{};
   if(cursor && focused() && glfwGetWindowAttrib(handle.get(), GLFW_HOVERED)) {
     position = pointer_position();
-    if(position[1] < 0 || position[1] >= 200 || (!frame.has_surround() && (position[0] < 0 || position[0] >= 320))) cursor = nullptr;
+    if(!frame.has_surround() && !render_size{}.bounds().contains(position[0], position[1])) cursor = nullptr;
   } else cursor = nullptr;
   presenter->bind(frame, colours, frame.has_surround() ? canvas.mission_size() : canvas.artwork_size(), area, height, cursor, position);
   glViewport(0, 0, width, height);
@@ -177,7 +177,7 @@ auto window::resolution() const->render_size {
     if(w > 0 && h > 0) last_drawable = {w, h};
   }
   auto const canvas{fixed_resolution.value_or(last_drawable)};
-  auto const size{canvas.artwork_size()};
+  auto const size{canvas.mission_size()};
   if(size.width > max_texture_size || size.height > max_texture_size) throw std::runtime_error{"render resolution exceeds the OpenGL texture limit"};
   return canvas;
 }
@@ -188,7 +188,7 @@ auto window::logical_position(double x, double y) const->std::array<int, 2> {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  return viewport::fit(bw, bh, resolution(), false, cockpit_pan).logical(x, y, width, height, bw, bh);
+  return viewport::fit(bw, bh, resolution(), false, framing).logical(x, y, width, height, bw, bh);
 }
 void window::warp_mouse(int x, int y) {
   int width{0};
@@ -197,7 +197,7 @@ void window::warp_mouse(int x, int y) {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  auto const p{viewport::fit(bw, bh, resolution(), false, cockpit_pan).cursor(x, y, width, height, bw, bh)};
+  auto const p{viewport::fit(bw, bh, resolution(), false, framing).cursor(x, y, width, height, bw, bh)};
   glfwSetCursorPos(handle.get(), p[0], p[1]);
 }
 void window::pump_events() {

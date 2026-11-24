@@ -48,7 +48,7 @@ class window {
   std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> handle{nullptr, glfwDestroyWindow};
   std::unique_ptr<indexed_display> presenter;
   int max_texture_size{0};
-  int cockpit_pan{0};
+  cockpit_framing framing;
   std::optional<render_size> fixed_resolution;
   mutable render_size last_drawable{};
   std::deque<window_event> events;
@@ -67,6 +67,7 @@ public:
   auto poll(window_event &event)->bool;
   void pump_events();
   void warp_mouse(int x, int y);
+  void pointer_framing(cockpit_framing view) { framing = view; }
   auto modifiers() const->int;
   auto focused() const->bool;
   auto get() const->GLFWwindow *;

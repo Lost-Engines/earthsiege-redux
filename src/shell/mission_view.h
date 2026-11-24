@@ -110,6 +110,7 @@ class mission_view {
   void update_interface_clock(uint32_t now);
   cockpit_impact_view impact_view() const;
   std::array<int32_t, 2> instrument_origin() const;
+  cockpit_framing cockpit_viewport() const;
   std::array<int32_t, 2> gauge_origin(std::array<int32_t, 2> origin) const;
   void update_displays(std::array<int32_t, 2> origin);
   environment_renderer environment;

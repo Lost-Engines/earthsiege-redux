@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 
@@ -19,6 +20,14 @@ struct rectangle {
     return {std::max(left, other.left), std::max(top, other.top),
             std::min(right, other.right), std::min(bottom, other.bottom)};
   }
+};
+
+// Origin of the active DOS page in the cockpit panorama, and its optical scale.
+struct cockpit_framing {
+  int pan{0}, down{0};
+  double scale{1};
+  int lower{0};
+  int sight_y{100};
 };
 
 struct render_size {
@@ -42,14 +51,18 @@ struct render_size {
     int const x{(width - w) / 2}, y{(height - h) / 2};
     return {x, y, x + w - 1, y + h - 1};
   }
-  // When panning left or right, stop at the outer edge of the three cockpit pages.
-  rectangle cockpit_panel(int pan) const {
-    auto panel{fit({})};
-    int const available{pan < 0 ? panel.left : width - panel.right - 1};
-    int const offset{std::clamp(pan, -320, 320) * std::min(available, panel.width()) / 320};
-    panel.left += offset;
-    panel.right += offset;
-    return panel;
+  rectangle cockpit_panel(cockpit_framing view = {}) const {
+    auto const base{fit({})};
+    int const w{std::max(1, static_cast<int>(std::lround(base.width() * view.scale)))};
+    int const h{std::max(1, static_cast<int>(std::lround(base.height() * view.scale)))};
+    int const middle{(width - w) / 2}, room{view.pan < 0 ? middle : width - w - middle};
+    int const x{middle + std::clamp(view.pan, -320, 320) * std::min(room, w) / 320};
+    // Zoom about the forward gunsight. Looking down scrolls as far as the lower console requires.
+    int const spare{base.height() - h};
+    int const above{static_cast<int>(std::lround(spare * std::clamp(view.sight_y, 0, 200) / 200.))};
+    int const travel{std::min(spare - above, edge(view.lower, h, 200))};
+    int const y{base.top + above + (view.lower ? std::clamp(view.down, 0, view.lower) * travel / view.lower : 0)};
+    return {x, y, x + w - 1, y + h - 1};
   }
   render_size artwork_size() const {
     auto const area{fit({})};

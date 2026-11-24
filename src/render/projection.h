@@ -14,6 +14,7 @@ struct projection_plane {
   double left{0}, top{0}, width{320}, height{200};
   bool operator==(projection_plane const &) const = default;
   static projection_plane cockpit(render_size output, vec2<int32_t> const &centre, double zoom, int pan = 0);
+  static projection_plane through_panel(render_size output, rectangle panel, vec2<int32_t> const &centre, double zoom = 1);
   rectangle bounds() const;
   rectangle pixels(rectangle area, render_size output) const;
   rectangle clip_bounds(rectangle area, render_size output) const;

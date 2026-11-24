@@ -20,9 +20,9 @@ Function entry(char const *name) {
 #define GL_ENTRY(name) entry<decltype(&name)>(#name)
 
 constexpr char const *fragment_source{R"GLSL(#version 120
-uniform sampler2D page, coverage, world, palette, leftWindow, rightWindow, pointer;
-uniform ivec2 canvasSize, pageSize, worldSize;
-uniform ivec4 viewRect, panelRect, sideSizes, pointerRect;
+uniform sampler2D page, coverage, world, palette, surround, pointer;
+uniform ivec2 canvasSize, pageSize, worldSize, surroundSize, sharedOrigin;
+uniform ivec4 viewRect, panelRect, pointerRect;
 
 vec2 texelCentre(ivec2 pixel, ivec2 size) {
   return (vec2(pixel) + 0.5) / vec2(size);
@@ -35,13 +35,8 @@ void main() {
   ivec2 pixel = ((2 * dst + 1) * canvasSize) / (2 * viewRect.zw);
   ivec2 local = pixel - panelRect.xy;
   float index;
-  if (pixel.x < panelRect.x) {
-    ivec2 size = sideSizes.xy;
-    index = texture2D(leftWindow, texelCentre(pixel * size / ivec2(panelRect.x,canvasSize.y),size)).r;
-  } else if (pixel.x >= panelRect.x + panelRect.z) {
-    int edge = panelRect.x + panelRect.z;
-    ivec2 size = sideSizes.zw;
-    index = texture2D(rightWindow, texelCentre((pixel - ivec2(edge,0)) * size / ivec2(canvasSize.x-edge,canvasSize.y),size)).r;
+  if (any(lessThan(local, ivec2(0))) || any(greaterThanEqual(local, panelRect.zw))) {
+    index = texture2D(surround, texelCentre(pixel * surroundSize / canvasSize, surroundSize)).r;
   } else {
     vec2 cell = texelCentre(local * pageSize / panelRect.zw, pageSize);
     index = texture2D(page, cell).r;
@@ -49,12 +44,16 @@ void main() {
       ivec2 worldPixel = local;
       if (any(notEqual(worldSize, panelRect.zw)))
         worldPixel = local * worldSize / panelRect.zw;
-      index = texture2D(world, texelCentre(worldPixel, worldSize)).r;
+      if (sharedOrigin.x >= 0)
+        index = texture2D(surround, texelCentre(sharedOrigin + worldPixel, surroundSize)).r;
+      else
+        index = texture2D(world, texelCentre(worldPixel, worldSize)).r;
     }
   }
   if (pointerRect.z > 0) {
     ivec2 cell = local * pageSize;
     if (cell.x < 0) cell.x -= panelRect.z - 1;
+    if (cell.y < 0) cell.y -= panelRect.w - 1;
     cell = cell / panelRect.zw - pointerRect.xy;
     if (all(greaterThanEqual(cell, ivec2(0))) && all(lessThan(cell, pointerRect.zw))) {
       float ink = texture2D(pointer, texelCentre(cell, pointerRect.zw)).r;
@@ -98,9 +97,10 @@ indexed_display::indexed_display()
   world_size = location(program, "worldSize");
   view_rect = location(program, "viewRect");
   panel_rect = location(program, "panelRect");
-  side_sizes = location(program, "sideSizes");
+  surround_size = location(program, "surroundSize");
+  shared_origin = location(program, "sharedOrigin");
   pointer_rect = location(program, "pointerRect");
-  constexpr std::array names{"page", "coverage", "world", "palette", "leftWindow", "rightWindow", "pointer"};
+  constexpr std::array names{"page", "coverage", "world", "palette", "surround", "pointer"};
   glGenTextures(plane_count, textures.data());
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   uint8_t const black[3]{};
@@ -141,17 +141,20 @@ void indexed_display::bind(framebuffer const &frame, palette const &palette, ren
   render_size detail_size{0, 0};
   if(std::ranges::any_of(mask, [](uint8_t pixel){return pixel != 0;})) {
     auto const region{frame.detail_region()};
-    upload(world, region);
+    if(!frame.shares_surround_detail()) upload(world, region);
     upload(coverage, {size, size.width, mask.data()});
     detail_size = region.size;
   }
-  auto const panel{frame.has_surround() ? canvas.cockpit_panel(frame.cockpit_pan()) : canvas.bounds()};
+  auto const panel{frame.has_surround() ? canvas.cockpit_panel(frame.cockpit_viewport()) : canvas.bounds()};
   if(frame.has_surround()) {
-    auto const left{frame.side_region(false)}, right{frame.side_region(true)};
-    if(left.size.width) upload(left_window, left);
-    if(right.size.width) upload(right_window, right);
-    uniform_rect(side_sizes, std::max(1, left.size.width), left.size.height, std::max(1, right.size.width), right.size.height);
+    auto const region{frame.surround_region()};
+    upload(surround, region);
+    uniform_size(surround_size, region.size.width, region.size.height);
   }
+  if(frame.shares_surround_detail()) {
+    auto const region{frame.detail_in_surround()};
+    uniform_size(shared_origin, region.left, region.top);
+  } else uniform_size(shared_origin, -1, -1);
   uniform_rect(panel_rect, panel.left, panel.top, panel.width(), panel.height());
   if(cursor) {
     auto const area{cursor->bounds(position[0], position[1])};

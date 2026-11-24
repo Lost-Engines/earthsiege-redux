@@ -32,10 +32,12 @@ double cockpit_fov_zoom(double degrees) {
 }
 
 projection_plane projection_plane::cockpit(render_size output, vec2<int32_t> const &centre, double zoom, int pan) {
-  auto const panel{output.cockpit_panel(pan)};
-  double const x_scale{320.0 / panel.width() / zoom};
-  return {centre.x * (1 - 1 / zoom) - panel.left * x_scale, centre.y * (1 - 1 / zoom),
-          output.width * x_scale, 200.0 / zoom};
+  return through_panel(output, output.cockpit_panel({.pan = pan}), centre, zoom);
+}
+projection_plane projection_plane::through_panel(render_size output, rectangle panel, vec2<int32_t> const &centre, double zoom) {
+  double const sx{320.0 / panel.width() / zoom}, sy{200.0 / panel.height() / zoom};
+  return {centre.x * (1 - 1 / zoom) - panel.left * sx, centre.y * (1 - 1 / zoom) - panel.top * sy,
+          output.width * sx, output.height * sy};
 }
 
 rectangle projection_plane::bounds() const {

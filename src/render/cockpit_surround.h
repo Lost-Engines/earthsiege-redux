@@ -7,13 +7,16 @@ namespace earthsiege {
 // coordinates. Negative entries are glass in the corresponding ED mask.
 class cockpit_surround {
   int first_x, width, height;
+  std::array<int32_t, 2> sight;
+  std::array<int, 2> window_sill;
   std::vector<int16_t> artwork;
-  framebuffer front;
+  framebuffer front, lower;
 public:
   explicit cockpit_surround(cockpit_artwork const &cockpit);
   framebuffer const &forward_panel() const { return front; }
-  void draw_sides(framebuffer &world, std::array<int32_t, 2> origin, bitmap const *lift = nullptr, int cover_y = 0,
-                  framebuffer const *instruments = nullptr) const;
+  framebuffer const &lower_panel() const { return lower; }
+  void draw(framebuffer &world, rectangle panel, std::array<int32_t, 2> origin, bitmap const *lift = nullptr, int cover_y = 0,
+            framebuffer const *forward_instruments = nullptr, framebuffer const *lower_instruments = nullptr) const;
 };
 
 } // namespace earthsiege

@@ -134,6 +134,7 @@ bool demo_playback::alert(int message, presenter const &show) {
   dialog_clock timing;
   bool left{false};
   std::optional<int> response;
+  auto const backdrop{view_.image().dialog_backdrop()};
   while(!response && !finished) {
     if(next == tape.frames.size()) {
       finished = true;
@@ -149,7 +150,7 @@ bool demo_playback::alert(int message, presenter const &show) {
       left = held;
     }
     if(!response) response = dialog.input(input.command, input.buttons & 1, input.buttons & 2, settings.current()[10] != 0).response;
-    auto frame{view_.image()};
+    auto frame{backdrop};
     dialog.draw(frame);
     if(auto const warp{dialog.take_warp()}) pointer = *warp;
     dialog_cursor.draw(frame, pointer.x, pointer.y);

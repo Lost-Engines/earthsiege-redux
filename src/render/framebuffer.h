@@ -54,7 +54,7 @@ class framebuffer {
   // that page stay valid while a pan can share a much larger backing image.
   std::shared_ptr<framebuffer const> surround;
   rectangle surround_area;
-  int pan{0};
+  cockpit_framing framing;
 
 public:
   framebuffer() : framebuffer{render_size{}} {}
@@ -65,11 +65,17 @@ public:
   render_size detail_size() const { return {detail_area.width(), detail_area.height()}; }
   indexed_region detail_region() const;
   bool has_surround() const { return static_cast<bool>(surround); }
-  int cockpit_pan() const { return surround ? pan : 0; }
-  indexed_region side_region(bool right) const;
-  void set_surround(std::shared_ptr<framebuffer const> image, rectangle area, int cockpit_pan = 0);
+  cockpit_framing cockpit_viewport() const { return surround ? framing : cockpit_framing{}; }
+  indexed_region surround_region() const;
+  bool shares_surround_detail() const {
+    return surround && detail == surround && surround_area.contains(detail_area.left, detail_area.top)
+      && surround_area.contains(detail_area.right, detail_area.bottom);
+  }
+  rectangle detail_in_surround() const;
+  void set_surround(std::shared_ptr<framebuffer const> image, rectangle area, cockpit_framing view = {});
   void copy_surround(framebuffer const &source);
   void blit_presentation(framebuffer &dest, rectangle area) const;
+  framebuffer dialog_backdrop() const;
   std::span<uint8_t const> detail_mask() const { return detail ? std::span{visible} : std::span<uint8_t const>{}; }
   void attach(std::shared_ptr<framebuffer const> image, rectangle area, screen_mask const *window = nullptr);
   void restore_world(framebuffer const &source, screen_mask const &window);

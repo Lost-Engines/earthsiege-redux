@@ -61,6 +61,7 @@ class cockpit_radio {
   rectangle parent;
   std::array<rectangle, 3> portrait_bounds;
   framebuffer cache;
+  std::optional<int> lower_page;
   bool visible{false};
   bool text_enabled{true};
   std::string text;
@@ -93,7 +94,8 @@ public:
   void update(mission_session &session, camera_state const &camera, uint32_t ticks, int origin_x, int origin_y, bool restoring_cockpit = false);
   void prepare(mission_session &session, camera_state const &camera, uint32_t ticks, int origin_x, int origin_y, bool restoring_cockpit = false);
   void advance_queue(mission_session &session, uint32_t ticks);
-  void draw(framebuffer &frame);
+  void portrait_page(std::optional<int> y) { lower_page = y; }
+  void draw(framebuffer &frame, framebuffer *portrait_target = nullptr);
   void repaint() {
     system_repaint_pending = true;
   }

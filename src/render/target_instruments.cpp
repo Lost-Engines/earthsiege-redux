@@ -65,22 +65,25 @@ void draw_target_brackets(framebuffer &target, rectangle const &bounds, bool con
   }
 }
 void draw_side_target_brackets(framebuffer &world, rectangle panel, rectangle bounds, bool locked, uint8_t side) {
-  if(bounds.left >= 0 && bounds.right < 320) return;
+  if(bounds.left >= 0 && bounds.right < 320 && bounds.top >= 0 && bounds.bottom < 200) return;
   render_size const scale{panel.width(), panel.height()};
   int const left{-render_size::edge(panel.left, 320, panel.width())};
   int const right{render_size::edge(world.size().width - panel.left, 320, panel.width())};
-  if(bounds.right < left || bounds.left >= right ||
-     bounds.bottom < 0 || bounds.top >= 200 || bounds.height() <= 0) return;
+  int const top{-render_size::edge(panel.top, 200, panel.height())};
+  int const bottom{render_size::edge(world.size().height - panel.top, 200, panel.height())};
+  if(bounds.right < left || bounds.left >= right || bounds.bottom < top || bounds.top >= bottom || bounds.height() <= 0) return;
   // Use the HUD's native corner pixels on the other side of the panel seam.
   framebuffer glyph{{bounds.width(), bounds.height()}};
   draw_target_brackets(glyph, glyph.size().bounds(), locked, side);
   for(int y{0}; y < glyph.size().height; ++y) for(int x{0}; x < glyph.size().width; ++x) {
     uint8_t const ink{glyph.pixels()[static_cast<size_t>(y) * glyph.size().width + x]};
     int const px{bounds.left + x}, py{bounds.top + y};
-    if(!ink || (px >= 0 && px < 320)) continue;
+    if(!ink || render_size{}.bounds().contains(px, py)) continue;
     auto cell{scale.from_logical({px, py, px, py})};
     cell.left += panel.left;
     cell.right += panel.left;
+    cell.top += panel.top;
+    cell.bottom += panel.top;
     world.fill(cell, ink);
   }
 }

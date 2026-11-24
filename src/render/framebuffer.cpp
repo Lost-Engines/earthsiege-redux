@@ -19,44 +19,54 @@ indexed_region framebuffer::detail_region() const {
   return {detail_size(), stride, detail->raster.data() + static_cast<size_t>(detail_area.top) * stride + detail_area.left};
 }
 
-void framebuffer::set_surround(std::shared_ptr<framebuffer const> image, rectangle area, int cockpit_pan) {
+void framebuffer::set_surround(std::shared_ptr<framebuffer const> image, rectangle area, cockpit_framing view) {
   if(area.left < 0 || area.top < 0 || area.right >= image->extent.width || area.bottom >= image->extent.height)
     throw std::out_of_range{"cockpit surround exceeds its backing image"};
   surround = std::move(image);
   surround_area = area;
-  pan = cockpit_pan;
+  framing = view;
 }
 void framebuffer::copy_surround(framebuffer const &source) {
   surround = source.surround;
   surround_area = source.surround_area;
-  pan = source.pan;
+  framing = source.framing;
 }
-indexed_region framebuffer::side_region(bool right) const {
+indexed_region framebuffer::surround_region() const {
   if(!surround) return {{0, 0}, 0, nullptr};
-  render_size const size{surround_area.width(), surround_area.height()};
-  auto const middle{size.cockpit_panel(pan)};
-  int const x{right ? middle.right + 1 : 0};
-  int const width{right ? size.width - x : middle.left};
   int const stride{surround->extent.width};
-  return {{width, size.height}, stride, surround->raster.data() + static_cast<size_t>(surround_area.top) * stride + surround_area.left + x};
+  return {{surround_area.width(), surround_area.height()}, stride,
+          surround->raster.data() + static_cast<size_t>(surround_area.top) * stride + surround_area.left};
+}
+rectangle framebuffer::detail_in_surround() const {
+  return {detail_area.left - surround_area.left, detail_area.top - surround_area.top,
+          detail_area.right - surround_area.left, detail_area.bottom - surround_area.top};
+}
+
+framebuffer framebuffer::dialog_backdrop() const {
+  if(!surround || (framing.scale == 1 && !framing.pan)) return *this;
+  // Freeze the cockpit at its selected FOV. The dialog and its hitboxes use the normal UI scale.
+  auto const size{surround_region().size};
+  auto image{std::make_shared<framebuffer>(size)};
+  blit_presentation(*image, size.bounds());
+  framebuffer page;
+  page.attach(image, size.cockpit_panel());
+  page.set_surround(std::move(image), size.bounds());
+  return page;
 }
 
 void framebuffer::blit_presentation(framebuffer &dest, rectangle area) const {
   if(!surround) { blit_to(dest, area); return; }
-  auto const panel{render_size{area.width(), area.height()}.cockpit_panel(pan)};
-  blit_to(dest, {area.left + panel.left, area.top, area.left + panel.right, area.bottom});
-  for(bool right : {false, true}) {
-    auto const side{side_region(right)};
-    int const x{right ? panel.right + 1 : 0};
-    int const width{right ? area.width() - x : panel.left};
-    if(!width || !side.size.width) continue;
-    for(int y{0}; y < area.height(); ++y) {
-      auto const *row{side.pixels + static_cast<size_t>(int64_t{y} * side.size.height / area.height()) * side.stride};
-      auto out{dest.opaque_span(area.top + y, area.left + x, area.left + x + width - 1)};
-      if(width == side.size.width) std::copy_n(row, width, out.begin());
-      else for(int i{0}; i < width; ++i) out[i] = row[int64_t{i} * side.size.width / width];
-    }
+  auto const source{surround_region()};
+  auto const clipped{area.intersect(dest.size().bounds())};
+  if(clipped.width() <= 0 || clipped.height() <= 0) return;
+  for(int y{clipped.top}; y <= clipped.bottom; ++y) {
+    auto const *row{source.pixels + int64_t{y - area.top} * source.size.height / area.height() * source.stride};
+    auto out{dest.opaque_span(y, clipped.left, clipped.right)};
+    if(area.width() == source.size.width) std::copy_n(row + clipped.left - area.left, out.size(), out.begin());
+    else for(int x{clipped.left}; x <= clipped.right; ++x) out[x - clipped.left] = row[int64_t{x - area.left} * source.size.width / area.width()];
   }
+  auto const panel{render_size{area.width(), area.height()}.cockpit_panel(framing)};
+  blit_to(dest, {area.left + panel.left, area.top + panel.top, area.left + panel.right, area.top + panel.bottom});
 }
 
 void framebuffer::attach(std::shared_ptr<framebuffer const> image, rectangle area, screen_mask const *window) {

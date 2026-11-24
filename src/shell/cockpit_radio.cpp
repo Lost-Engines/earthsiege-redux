@@ -114,13 +114,14 @@ void cockpit_radio::advance_portraits(mission_session &session, uint32_t const f
 }
 void cockpit_radio::prepare(mission_session &session, camera_state const &camera, uint32_t const ticks, int const origin_x, int const origin_y, bool const restoring_cockpit) {
   bool const inside{camera.mode == camera_mode::attached || restoring_cockpit};
-  visible = inside && parent.right >= origin_x && parent.left < origin_x + 320 && parent.bottom >= origin_y && parent.top < origin_y + 200;
+  int const px{lower_page ? 0 : origin_x}, py{lower_page.value_or(origin_y)};
+  visible = inside && parent.right >= px && parent.left < px + 320 && parent.bottom >= py && parent.top < py + 200;
   for(auto &p : members) {
     auto b{p.bounds};
-    b.left -= origin_x;
-    b.right -= origin_x;
-    b.top -= origin_y;
-    b.bottom -= origin_y;
+    b.left -= px;
+    b.right -= px;
+    b.top -= py;
+    b.bottom -= py;
     if(b.left != p.painted.left || b.top != p.painted.top) {
       p.initialized = false;
       p.painted = b;
@@ -236,24 +237,24 @@ void cockpit_radio::overpaint(rectangle const &b) {
     }
   }
 }
-void cockpit_radio::draw(framebuffer &frame) {
+void cockpit_radio::draw(framebuffer &frame, framebuffer *portrait_target) {
   if(visible) {
+    auto &portraits{portrait_target ? *portrait_target : frame};
+    int const page_x{lower_page ? 0 : system_origin_x}, page_y{lower_page.value_or(system_origin_y)};
     auto bounds{portrait_bounds};
     for(auto &b : bounds) {
       b = b.inset(1);
-      b.left -= system_origin_x;
-      b.right -= system_origin_x;
-      b.top -= system_origin_y;
-      b.bottom -= system_origin_y;
+      b.left -= page_x;
+      b.right -= page_x;
+      b.top -= page_y;
+      b.bottom -= page_y;
     }
-    wingmate_portrait::draw_empty(frame, bounds, (1u << members.size()) - 1, resources.edition());
-  }
-  if(visible) {
+    wingmate_portrait::draw_empty(portraits, bounds, (1u << members.size()) - 1, resources.edition());
     for(auto const &p : members) {
       if(p.initialized) {
         for(int y{std::max(0, p.painted.top)}; y <= std::min(199, p.painted.bottom); ++y) {
           for(int x{std::max(0, p.painted.left)}; x <= std::min(319, p.painted.right); ++x) {
-            frame.pixel(x, y, cache.pixels()[static_cast<size_t>(y * 320 + x)]);
+            portraits.pixel(x, y, cache.pixels()[static_cast<size_t>(y * 320 + x)]);
           }
         }
       }
