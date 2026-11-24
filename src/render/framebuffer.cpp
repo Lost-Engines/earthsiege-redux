@@ -19,6 +19,46 @@ indexed_region framebuffer::detail_region() const {
   return {detail_size(), stride, detail->raster.data() + static_cast<size_t>(detail_area.top) * stride + detail_area.left};
 }
 
+void framebuffer::set_surround(std::shared_ptr<framebuffer const> image, rectangle area, int cockpit_pan) {
+  if(area.left < 0 || area.top < 0 || area.right >= image->extent.width || area.bottom >= image->extent.height)
+    throw std::out_of_range{"cockpit surround exceeds its backing image"};
+  surround = std::move(image);
+  surround_area = area;
+  pan = cockpit_pan;
+}
+void framebuffer::copy_surround(framebuffer const &source) {
+  surround = source.surround;
+  surround_area = source.surround_area;
+  pan = source.pan;
+}
+indexed_region framebuffer::side_region(bool right) const {
+  if(!surround) return {{0, 0}, 0, nullptr};
+  render_size const size{surround_area.width(), surround_area.height()};
+  auto const middle{size.cockpit_panel(pan)};
+  int const x{right ? middle.right + 1 : 0};
+  int const width{right ? size.width - x : middle.left};
+  int const stride{surround->extent.width};
+  return {{width, size.height}, stride, surround->raster.data() + static_cast<size_t>(surround_area.top) * stride + surround_area.left + x};
+}
+
+void framebuffer::blit_presentation(framebuffer &dest, rectangle area) const {
+  if(!surround) { blit_to(dest, area); return; }
+  auto const panel{render_size{area.width(), area.height()}.cockpit_panel(pan)};
+  blit_to(dest, {area.left + panel.left, area.top, area.left + panel.right, area.bottom});
+  for(bool right : {false, true}) {
+    auto const side{side_region(right)};
+    int const x{right ? panel.right + 1 : 0};
+    int const width{right ? area.width() - x : panel.left};
+    if(!width || !side.size.width) continue;
+    for(int y{0}; y < area.height(); ++y) {
+      auto const *row{side.pixels + static_cast<size_t>(int64_t{y} * side.size.height / area.height()) * side.stride};
+      auto out{dest.opaque_span(area.top + y, area.left + x, area.left + x + width - 1)};
+      if(width == side.size.width) std::copy_n(row, width, out.begin());
+      else for(int i{0}; i < width; ++i) out[i] = row[int64_t{i} * side.size.width / width];
+    }
+  }
+}
+
 void framebuffer::attach(std::shared_ptr<framebuffer const> image, rectangle area, screen_mask const *window) {
   detail = std::move(image);
   detail_area = area;
@@ -36,6 +76,7 @@ void framebuffer::attach(std::shared_ptr<framebuffer const> image, rectangle are
 }
 
 void framebuffer::restore_world(framebuffer const &source, screen_mask const &window) {
+  copy_surround(source);
   detail = source.detail;
   detail_area = source.detail_area;
   if(detail) visible.assign(raster.size(), 0);
@@ -177,6 +218,7 @@ scoped_framebuffer_clip::~scoped_framebuffer_clip() {
 
 void framebuffer::clear(uint8_t colour) {
   detail.reset();
+  surround.reset();
   std::ranges::fill(raster, colour);
 }
 

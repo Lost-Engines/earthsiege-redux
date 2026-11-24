@@ -7,8 +7,10 @@
 namespace earthsiege {
 
 void framebuffer::save(std::filesystem::path const &path, palette const &colours, render_size canvas) const {
-  auto const area{canvas.fit({})};
-  auto const image{resampled({area.width(), area.height()})};
+  auto area{canvas.fit({})};
+  if(has_surround()) { area.left = 0; area.right = canvas.width - 1; }
+  framebuffer image{{area.width(), area.height()}};
+  blit_presentation(image, image.size().bounds());
   std::ofstream file{path, std::ios::binary};
   file << "P6\n" << canvas.width << ' ' << canvas.height << "\n255\n";
   std::vector<char> row(static_cast<size_t>(canvas.width) * 3);

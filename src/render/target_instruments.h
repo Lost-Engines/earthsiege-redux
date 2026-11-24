@@ -15,4 +15,5 @@ struct hud_target_state {
 /// Project the original two vertical world points, then limit bracket size.
 std::optional<rectangle> target_brackets(hud_target_state const &state, model_transform const &world_to_camera, camera_projection const &projection);
 void draw_target_brackets(framebuffer &target, rectangle const &bounds, bool locked, uint8_t side);
+void draw_side_target_brackets(framebuffer &world, rectangle panel, rectangle bounds, bool locked, uint8_t side);
 } // namespace earthsiege

@@ -14,10 +14,11 @@ struct viewport {
   int width{1};
   int height{1};
 
-  static auto fit(int width, int height, render_size canvas = {})->viewport {
+  static auto fit(int width, int height, render_size canvas = {}, bool surround = false, int pan = 0)->viewport {
     render_size const drawable{std::max(1, width), std::max(1, height)};
     auto const outer{drawable.fit(canvas)};
-    auto const inner{canvas.fit({})};
+    auto inner{canvas.cockpit_panel(pan)};
+    if(surround) { inner.left = 0; inner.right = canvas.width - 1; }
     auto const x{render_size::edge(inner.left, outer.width(), canvas.width)};
     auto const y{render_size::edge(inner.top, outer.height(), canvas.height)};
     auto const right{render_size::edge(inner.right + 1, outer.width(), canvas.width)};

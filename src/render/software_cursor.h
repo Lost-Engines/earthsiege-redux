@@ -9,6 +9,8 @@ class software_cursor {
   int32_t hot_y{0};
 public:
   explicit software_cursor(bytes data);
+  bitmap const &artwork() const { return image; }
+  rectangle bounds(int x, int y) const;
   void draw(framebuffer &target, int x, int y) const;
 };
 }

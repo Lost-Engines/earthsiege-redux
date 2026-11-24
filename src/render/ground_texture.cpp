@@ -54,7 +54,7 @@ ground_texture::ground_texture(world_environment const &env, bytes texture, byte
 void ground_texture::draw(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles,
                           background_view const &view, background_bands const &bands) {
   last.reset();
-  if(target.size() != render_size{}) {
+  if(target.size() != render_size{} || view.plane != projection_plane{}) {
     draw_scaled(target, position, angles, view, bands);
     return;
   }
@@ -162,7 +162,7 @@ void ground_texture::draw(framebuffer &target, vec3<int32_t> const &position, ve
 void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles,
                                  background_view const &view, background_bands const &bands) const {
   auto const size{target.size()};
-  auto const area{size.from_logical(view.bounds).intersect(size.bounds())};
+  auto const area{view.plane.pixels(view.bounds, size).intersect(size.bounds())};
   if(area.left > area.right || area.top > area.bottom) return;
   auto cos_angle{[](uint16_t a){ return model_cosine(a) / 16384.; }};
   auto sin_angle{[&](uint16_t a){ return cos_angle(static_cast<uint16_t>(a - 16384)); }};
@@ -172,12 +172,12 @@ void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &posit
   double const focal{static_cast<double>(1u << view.projection_shift)};
   double const texel{std::ldexp(1., -static_cast<int>(texture_scale))};
   auto const horizon{bands.horizon[0]};
-  double const step{320. / size.width};
+  double const step{view.plane.width / size.width};
   std::vector<double> offsets;
   if(sr == 0) {
     // Retain the original pixel-centre increments, including fractional scales.
     offsets.reserve(area.width());
-    double lx{(area.left + .5) * step};
+    double lx{view.plane.left + (area.left + .5) * step};
     for(int x{area.left}; x <= area.right; ++x, lx += step) offsets.push_back(cr * (lx - view.centre.x));
   }
   auto const distance_shade{[&](double distance) {
@@ -189,8 +189,8 @@ void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &posit
     return shades[shade][source[v * 256 + u] & 15];
   }};
   auto const draw_row{[&](int y) {
-    double const ly{(y + .5) * 200. / size.height};
-    double lx{(area.left + .5) * step};
+    double const ly{view.plane.top + (y + .5) * view.plane.height / size.height};
+    double lx{view.plane.left + (area.left + .5) * step};
     auto const dy{ly - view.centre.y};
     // With a horizontal horizon every ray on this scanline has the same depth.
     if(sr == 0) {

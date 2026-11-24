@@ -4,6 +4,7 @@
 #include <vector>
 #include "vectorstorm/vector/vector2.h"
 #include "render/framebuffer.h"
+#include "render/projection.h"
 #include "resources/world.h"
 
 namespace earthsiege {
@@ -15,6 +16,7 @@ struct background_view {
   vec2<int32_t> centre{160, 100};
   vec2<int32_t> offset;
   rectangle bounds{0, 0, 319, 199};
+  projection_plane plane{};
 };
 
 enum class background_primitive_kind : uint8_t {
@@ -36,6 +38,6 @@ struct background_bands {
 
 /// Original low-detail sky/ground gradients, before panorama, clouds and ground texture
 background_bands make_background_bands(world_environment const &environment, background_view const &view, bool include_ground = true);
-void draw_background_bands(framebuffer &target, background_bands const &bands, rectangle bounds);
+void draw_background_bands(framebuffer &target, background_bands const &bands, rectangle bounds, projection_plane const &plane = {});
 
 } // namespace earthsiege

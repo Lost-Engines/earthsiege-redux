@@ -117,6 +117,7 @@ auto main(int argc, char *argv[])->int try {
         "  --soundfont PATH      SoundFont for the General MIDI music option\n"
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
+        "  --fov DEGREES         Horizontal field of view across the original cockpit (10-170, default 64.01)\n"
         "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 10, higher keeps detail farther away)\n"
         "  --distance-cutoff-multiplier N  Scale the range at which scenery and actors disappear (default: 10)\n"
         "  --fragment-pool-size N       Maximum airborne fragments and detached weapons (default: 600)\n"
@@ -165,6 +166,8 @@ auto main(int argc, char *argv[])->int try {
       fixed_resolution = resolution_option(argv[++index]);
     } else if(argument.starts_with("--resolution=")) {
       fixed_resolution = resolution_option(argument.substr(13));
+    } else if(option == "--fov") {
+      distances.zoom = earthsiege::cockpit_fov_zoom(multiplier_option(option, option_value()));
     } else if(option == "--lod-distance-multiplier") {
       distances.lod = multiplier_option(option, option_value());
     } else if(option == "--distance-cutoff-multiplier") {

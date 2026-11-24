@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include "viewport.h"
+#include "render/software_cursor.h"
 #include "resources/artwork.h"
 
 namespace earthsiege {
@@ -19,9 +20,9 @@ Function entry(char const *name) {
 #define GL_ENTRY(name) entry<decltype(&name)>(#name)
 
 constexpr char const *fragment_source{R"GLSL(#version 120
-uniform sampler2D page, coverage, world, palette;
+uniform sampler2D page, coverage, world, palette, leftWindow, rightWindow, pointer;
 uniform ivec2 canvasSize, pageSize, worldSize;
-uniform ivec4 viewRect;
+uniform ivec4 viewRect, panelRect, sideSizes, pointerRect;
 
 vec2 texelCentre(ivec2 pixel, ivec2 size) {
   return (vec2(pixel) + 0.5) / vec2(size);
@@ -32,13 +33,33 @@ void main() {
   // scaled to fit the window. The HUD uses integer cell boundaries within it.
   ivec2 dst = ivec2(int(gl_FragCoord.x) - viewRect.x, viewRect.y - int(gl_FragCoord.y));
   ivec2 pixel = ((2 * dst + 1) * canvasSize) / (2 * viewRect.zw);
-  vec2 cell = texelCentre(pixel * pageSize / canvasSize, pageSize);
-  float index = texture2D(page, cell).r;
-  if (worldSize.x > 0 && texture2D(coverage, cell).r > 0.0) {
-    ivec2 worldPixel = pixel;
-    if (any(notEqual(worldSize, canvasSize)))
-      worldPixel = pixel * worldSize / canvasSize;
-    index = texture2D(world, texelCentre(worldPixel, worldSize)).r;
+  ivec2 local = pixel - panelRect.xy;
+  float index;
+  if (pixel.x < panelRect.x) {
+    ivec2 size = sideSizes.xy;
+    index = texture2D(leftWindow, texelCentre(pixel * size / ivec2(panelRect.x,canvasSize.y),size)).r;
+  } else if (pixel.x >= panelRect.x + panelRect.z) {
+    int edge = panelRect.x + panelRect.z;
+    ivec2 size = sideSizes.zw;
+    index = texture2D(rightWindow, texelCentre((pixel - ivec2(edge,0)) * size / ivec2(canvasSize.x-edge,canvasSize.y),size)).r;
+  } else {
+    vec2 cell = texelCentre(local * pageSize / panelRect.zw, pageSize);
+    index = texture2D(page, cell).r;
+    if (worldSize.x > 0 && texture2D(coverage, cell).r > 0.0) {
+      ivec2 worldPixel = local;
+      if (any(notEqual(worldSize, panelRect.zw)))
+        worldPixel = local * worldSize / panelRect.zw;
+      index = texture2D(world, texelCentre(worldPixel, worldSize)).r;
+    }
+  }
+  if (pointerRect.z > 0) {
+    ivec2 cell = local * pageSize;
+    if (cell.x < 0) cell.x -= panelRect.z - 1;
+    cell = cell / panelRect.zw - pointerRect.xy;
+    if (all(greaterThanEqual(cell, ivec2(0))) && all(lessThan(cell, pointerRect.zw))) {
+      float ink = texture2D(pointer, texelCentre(cell, pointerRect.zw)).r;
+      if (ink > 0.0) index = ink;
+    }
   }
   gl_FragColor = texture2D(palette, vec2((index * 255.0 + 0.5) / 256.0, 0.5));
 }
@@ -76,7 +97,10 @@ indexed_display::indexed_display()
   page_size = location(program, "pageSize");
   world_size = location(program, "worldSize");
   view_rect = location(program, "viewRect");
-  constexpr std::array names{"page", "coverage", "world", "palette"};
+  panel_rect = location(program, "panelRect");
+  side_sizes = location(program, "sideSizes");
+  pointer_rect = location(program, "pointerRect");
+  constexpr std::array names{"page", "coverage", "world", "palette", "leftWindow", "rightWindow", "pointer"};
   glGenTextures(plane_count, textures.data());
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   uint8_t const black[3]{};
@@ -109,7 +133,8 @@ void indexed_display::upload(plane which, indexed_region image) {
     extents[which] = image.size;
   }
 }
-void indexed_display::bind(framebuffer const &frame, palette const &palette, render_size canvas, viewport const &view, int drawable_height) {
+void indexed_display::bind(framebuffer const &frame, palette const &palette, render_size canvas, viewport const &view, int drawable_height,
+                           software_cursor const *cursor, std::array<int, 2> const &position) {
   auto const size{frame.size()};
   upload(page, {size, size.width, frame.pixels().data()});
   auto const mask{frame.detail_mask()};
@@ -120,6 +145,19 @@ void indexed_display::bind(framebuffer const &frame, palette const &palette, ren
     upload(coverage, {size, size.width, mask.data()});
     detail_size = region.size;
   }
+  auto const panel{frame.has_surround() ? canvas.cockpit_panel(frame.cockpit_pan()) : canvas.bounds()};
+  if(frame.has_surround()) {
+    auto const left{frame.side_region(false)}, right{frame.side_region(true)};
+    if(left.size.width) upload(left_window, left);
+    if(right.size.width) upload(right_window, right);
+    uniform_rect(side_sizes, std::max(1, left.size.width), left.size.height, std::max(1, right.size.width), right.size.height);
+  }
+  uniform_rect(panel_rect, panel.left, panel.top, panel.width(), panel.height());
+  if(cursor) {
+    auto const area{cursor->bounds(position[0], position[1])};
+    upload(pointer, {{area.width(), area.height()}, area.width(), cursor->artwork().pixels.data()});
+    uniform_rect(pointer_rect, area.left, area.top, area.width(), area.height());
+  } else uniform_rect(pointer_rect, 0, 0, 0, 0);
   std::array<std::array<uint8_t, 3>, 256> rgb;
   for(size_t i{0}; i < rgb.size(); ++i) {
     auto const c{palette.colours[i]};

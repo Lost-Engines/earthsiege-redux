@@ -133,7 +133,7 @@ std::vector<size_t> scenery_renderer::draw_objects(vec3<int32_t> const &position
             }
             if(area < (int64_t{1} << 32) && (area < 0 || wrap_long(area) < 1)) std::ranges::reverse(points);
           }
-          draw_solid_polygon(target, points, target.size().from_logical(view.bounds), ribbon->colour, polygon_winding::preserve);
+          draw_solid_polygon(target, points, projection.plane.pixels(view.bounds, target.size()), ribbon->colour, polygon_winding::preserve);
         }
         continue;
       }

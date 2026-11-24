@@ -1,6 +1,7 @@
 #include "mission_view.h"
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -47,6 +48,7 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
     ui_random{session->interface_random()},
     audio{resources, music},
     lod_distance_multiplier{distances.lod},
+    camera_zoom{distances.zoom},
     cockpit{read_cockpit(resources, read_resource_names(resources.read("simvol0", "nam/MECHS.NAM")).at(static_cast<size_t>(session->player_chassis())))},
     reactor{resources, cockpit.layout},
     throttle{resources, cockpit.layout},
@@ -131,8 +133,7 @@ mission_view::mission_view(resource_store const &resources, std::unique_ptr<miss
   hdd = std::make_unique<cockpit_hdd>(resources, cockpit.layout, *session, instruments, ui_random, distances.lod);
   for(size_t i{0}; i < edge_controls.size(); ++i) edge_controls[i] = instruments.add_button(cockpit_edge_bounds(0)[i]);
   auto const origin{instrument_origin()};
-  displays->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
-  hdd->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
+  update_displays(origin);
   radio->update(*session, camera, interface_ticks, origin[0], origin[1], transitions.snapshot().prepared && transitions.snapshot().pending == 3);
   auto const &player{session->player_actor()};
   navigation.update(static_cast<int16_t>(player.body().movement().angles.z), player.body().torso().angle,
@@ -171,6 +172,16 @@ std::array<int32_t, 2> mission_view::instrument_origin() const {
   auto origin{cockpit.windows[static_cast<size_t>(painted_panel())].instrument_origin};
   if(camera.mode == camera_mode::attached) origin[1] += startup ? startup->displacement() : impact.snapshot().displacement;
   return origin;
+}
+std::array<int32_t, 2> mission_view::gauge_origin(std::array<int32_t, 2> origin) const {
+  if(origin[0] && camera.mode == camera_mode::attached && !options_camera && scene_size.width > scene_size.artwork_size().width)
+    return {0, 0};
+  return origin;
+}
+void mission_view::update_displays(std::array<int32_t, 2> origin) {
+  auto const [x,y]{gauge_origin(origin)};
+  displays->update(*session, instruments, camera, interface_ticks, x, y);
+  hdd->update(*session, instruments, camera, interface_ticks, x, y);
 }
 
 void mission_view::apply_preferences(preferences const &prefs) {
@@ -218,7 +229,13 @@ void mission_view::mouse_button(bool const right, bool const pressed) {
 
 void mission_view::consume_pointer_events() {
   auto const origin{instrument_origin()};
-  instruments.window_bounds({origin[0], origin[1], origin[0] + 319, origin[1] + 199});
+  rectangle active{origin[0], origin[1], origin[0] + 319, origin[1] + 199};
+  if(!options_camera && scene_size.width > scene_size.artwork_size().width) {
+    auto const area{scene_size.cockpit_panel(origin[0])};
+    active.left -= render_size::edge(area.left, 320, area.width());
+    active.right += render_size::edge(scene_size.width - area.right - 1, 320, area.width());
+  }
+  instruments.window_bounds(active);
   auto edges{cockpit_edge_bounds(static_cast<int>(painted_panel()))};
   for(size_t i{0}; i < edges.size(); ++i) {
     auto b{edges[i]};
@@ -356,7 +373,7 @@ void mission_view::change_cockpit_view(cockpit_view const view) {
 }
 void mission_view::apply_cockpit_view(cockpit_view const view, bool reset_input) {
   if(panel != view) {
-    auto const origin{cockpit.windows[static_cast<size_t>(view)].instrument_origin};
+    auto const origin{gauge_origin(cockpit.windows[static_cast<size_t>(view)].instrument_origin)};
     clock.refresh_retained(transitions.snapshot().other_page / 2, clock.visible_at(origin[0], origin[1]));
   }
   auto const previous{impact_view().mode};
@@ -370,8 +387,7 @@ void mission_view::apply_cockpit_view(cockpit_view const view, bool reset_input)
   // Widgets advance on the next frame, not again while presenting the old one.
   if(!reset_input) return;
   auto const origin{instrument_origin()};
-  displays->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
-  hdd->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
+  update_displays(origin);
   radio->update(*session, camera, interface_ticks, origin[0], origin[1], transitions.snapshot().prepared && transitions.snapshot().pending == 3);
 }
 
@@ -385,10 +401,38 @@ void mission_view::present_view() {
     if(state.pending == 0 || state.pending >= 4) secondary_cursor = true;
     if(state.pending == 1) secondary_cursor = false;
     edge_cursor = 0;
-    for(auto const &position : cockpit_pan_path(state.pending, state.view, cockpit.windows)) {
+    auto const path{cockpit_pan_path(state.pending, state.view, cockpit.windows)};
+    auto const output{scene_size.mission_size()};
+    auto const central{scene_size.artwork_size()};
+    std::shared_ptr<framebuffer> panorama;
+    vec2<int32_t> const first{0, state.pending < 2 ? cockpit.windows[state.view].instrument_origin[1] : 0};
+    int const start_pan{previous_cockpit ? previous_cockpit->cockpit_pan() : 0};
+    auto const left_edge{[&](int x) {
+      return render_size::edge(x, central.width, 320) - output.cockpit_panel(start_pan + x).left;
+    }};
+    auto const last{path.empty() ? first : path.back()};
+    int const left{std::min(left_edge(first.x), left_edge(last.x))}, top{std::min(first.y, last.y)};
+    auto const scanout{[&](vec2<int32_t> const &p) {
+      int const x{left_edge(p.x) - left};
+      int const y{render_size::edge(p.y - top, central.height, 200)};
+      return rectangle{x, y, x + output.width - 1, y + output.height - 1};
+    }};
+    if(!path.empty() && frame.has_surround() && previous_cockpit) {
+      auto const a{scanout(first)}, b{scanout(path.back())};
+      panorama = std::make_shared<framebuffer>(render_size{std::max(a.right, b.right) + 1, std::max(a.bottom, b.bottom) + 1});
+      previous_cockpit->blit_presentation(*panorama, a);
+      frame.blit_presentation(*panorama, b);
+    }
+    for(auto const &position : path) {
       auto const page{state.pending < 2 ? state.other_page : state.draw_page};
       framebuffer image;
       surface.sample(image, page * 160 + position.x, position.y);
+      if(panorama) {
+        // Downward VGA scrolling can overshoot the lower panel by three rows.
+        auto pos{position};
+        pos.y = std::clamp(pos.y, top, std::max(first.y, last.y));
+        image.set_surround(panorama, scanout(pos), start_pan + pos.x);
+      } else image.copy_surround(frame);
       pan_frames.push_back(std::move(image));
     }
     // At the end of a horizontal scroll 22904 copies the incoming view
@@ -398,7 +442,10 @@ void mission_view::present_view() {
   if(state.prepared && state.pending == 3) {
     surface.restore_from_external(state.other_page * 160, state.draw_page * 160);
     auto const view{static_cast<size_t>(state.saved_view)};
-    surface.sample(frame, state.other_page * 160, cockpit.windows[view].instrument_origin[1]);
+    framebuffer restored;
+    surface.sample(restored, state.other_page * 160, cockpit.windows[view].instrument_origin[1]);
+    restored.copy_surround(frame);
+    frame = std::move(restored);
   }
   auto before{state.view};
   transitions.present();
@@ -483,7 +530,10 @@ void mission_view::finish_startup_frame(uint32_t palette_clock, uint32_t end_clo
   } else {
     startup->drawn(end_clock);
     // 57ffc never calls 59b40 in this loop: scan out the last lift page.
-    surface.sample(frame, startup_page, startup->displacement());
+    framebuffer scanout;
+    surface.sample(scanout, startup_page, startup->displacement());
+    scanout.copy_surround(frame);
+    frame = std::move(scanout);
     if(startup->finished()) {
       startup.reset();
       clear_input();
@@ -550,7 +600,7 @@ void mission_view::prepare_frame(uint32_t now) {
   consume_pointer_events();
 }
 void mission_view::update_interface_clock(uint32_t now) {
-  auto const origin{instrument_origin()};
+  auto const origin{gauge_origin(instrument_origin())};
   auto const pages{transitions.snapshot()};
   clock.update_retained(now, pages.draw_page / 2, pages.other_page / 2,
     clock.visible_at(origin[0], origin[1], camera.mode != camera_mode::attached), pages.prepared);
@@ -757,8 +807,7 @@ void mission_view::exchange_panel_values() {
 }
 void mission_view::update_widgets() {
   auto const origin{instrument_origin()};
-  displays->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
-  hdd->update(*session, instruments, camera, interface_ticks, origin[0], origin[1]);
+  update_displays(origin);
   radio->prepare(*session, camera, interface_ticks, origin[0], origin[1], transitions.snapshot().prepared && transitions.snapshot().pending == 3);
 }
 void mission_view::flush_interface_audio() {
@@ -853,6 +902,11 @@ void mission_view::draw() {
   model_view view;
   view.detail.distance_multiplier = lod_distance_multiplier;
   view.cull_bounds = true;
+  auto const central_size{scene_size.artwork_size()};
+  auto const output{options_camera ? central_size : scene_size.mission_size()};
+  bool const wide{output.width > central_size.width};
+  int const pan{inside ? window.instrument_origin[0] : 0};
+  auto const central_area{wide ? output.cockpit_panel(pan) : output.bounds()};
   if(options_camera) {
     view.bounds = {0, 0, 319, 110};
     view.projection.centre = {160, 50};
@@ -870,13 +924,47 @@ void mission_view::draw() {
       view.projection.centre.y -= shift;
       view.bounds.top -= shift;
       view.bounds.bottom -= shift;
-      if(startup->lifting()) {
-        startup_cover = startup->cover_y(camera.position.z, view.projection);
-        view.bounds.bottom = std::clamp(startup_cover, view.bounds.top, view.bounds.bottom);
-      }
     }
   }
+  auto hud_projection{view.projection};
+  if(camera_zoom != 1) hud_projection.plane = projection_plane::cockpit({}, view.projection.centre, camera_zoom);
+  if(inside && startup && startup->lifting()) {
+    startup_cover = startup->cover_y(camera.position.z, hud_projection);
+    view.bounds.bottom = std::clamp(startup_cover, view.bounds.top, view.bounds.bottom);
+  }
   if(!inside) mask = external_view_artwork::clipping(view.bounds);
+  if(wide || camera_zoom != 1) {
+    int top{view.bounds.top}, bottom{view.bounds.bottom};
+    if(wide && inside) {
+      auto const origin{window.instrument_origin};
+      for(auto const &adjacent : cockpit.windows) {
+        if(adjacent.instrument_origin[1] != origin[1]) continue;
+        top = std::min(top, adjacent.bounds.top - shift);
+        bottom = std::max(bottom, adjacent.bounds.bottom - shift);
+      }
+      if(startup && startup->lifting()) bottom = std::min(bottom, startup_cover);
+    }
+    view.projection.plane = projection_plane::cockpit(output, view.projection.centre, camera_zoom, pan);
+    auto const &plane{view.projection.plane};
+    view.bounds = plane.bounds();
+    view.bounds.top = std::max(view.bounds.top, static_cast<int>(std::floor(plane.top + top * plane.height / 200)));
+    view.bounds.bottom = std::min(view.bounds.bottom, static_cast<int>(std::ceil(plane.top + (bottom + 1) * plane.height / 200)) - 1);
+  }
+  std::shared_ptr<framebuffer> surround_image;
+  std::optional<framebuffer> forward_instruments;
+  if(wide && inside && !surround_art) surround_art.emplace(cockpit);
+  auto const paint_sides{[&](framebuffer &target) {
+    if(inside) {
+      auto origin{window.instrument_origin};
+      origin[1] += shift;
+      surround_art->draw_sides(target, origin, startup && startup->lifting() ? &lift_artwork : nullptr, startup_cover,
+                               forward_instruments ? &*forward_instruments : nullptr);
+    } else {
+      auto const area{output.from_logical(external_view_artwork::bounds)};
+      target.fill({0, 0, output.width - 1, area.top - 1}, 63);
+      target.fill({0, area.bottom + 1, output.width - 1, output.height - 1}, 63);
+    }
+  }};
   // 59c8f skips the world while the lower panel is stable. The transition
   // still draws it, but idle lower-panel frames do not advance cloud wind.
   if(session->recording_paused() && !options_camera) {
@@ -886,9 +974,9 @@ void mission_view::draw() {
     // world in its far-ground colour so a gap cannot expose an earlier frame.
     auto const &background{session->scenery().environment().background};
     auto const horizon_colour{static_cast<uint8_t>(background.ground_palette_start + background.ground_bands - 1)};
-    bool const original{scene_size == render_size{}};
-    world_target = original ? frame : framebuffer{scene_size, horizon_colour};
-    world_target.clip(&mask);
+    bool const original{output == render_size{} && view.projection.plane == projection_plane{}};
+    world_target = original ? frame : framebuffer{output, horizon_colour};
+    if(view.projection.plane == projection_plane{} || output != render_size{}) world_target.clip(&mask);
     if(original) world_target.fill(view.bounds, horizon_colour);
     // 25b68 passes the cockpit's authored layout offset to 26264. The
     // projection centre alone leaves uncovered sky in an off-centre side view.
@@ -901,24 +989,36 @@ void mission_view::draw() {
     renderer.draw_objects(camera.position, camera.angles, {}, false, objects, &effects.lights(), ground, view);
     world_target.clip(nullptr);
     if(original) frame = std::move(world_target);
-    else frame.attach(std::make_shared<framebuffer>(std::move(world_target)), scene_size.bounds(), &mask);
+    else {
+      auto image{std::make_shared<framebuffer>(std::move(world_target))};
+      frame.attach(image, central_area, &mask);
+      if(wide) {
+        surround_image = image;
+        frame.set_surround(image, output.bounds(), pan);
+      }
+    }
     if(!options_camera) {
       world_frame = frame;
       world_frame.clip(nullptr);
     }
+  } else if(wide) {
+    surround_image = std::make_shared<framebuffer>(output, 63);
+    frame.set_surround(surround_image, output.bounds(), pan);
   }
   session->refresh_target_instruments(inside && panel == cockpit_view::forward);
   if(inside) {
     auto const &player{session->player_actor()};
     auto const origin{instrument_origin()};
-    int const x{-origin[0]};
-    int const y{-origin[1]};
-    lamps.draw(frame, x, y);
-    clock.draw_retained(frame, transitions.snapshot().other_page / 2, x, y);
-    reactor.draw(frame, painted_reactor, x, y);
+    // A side view can still see part of the live dashboard beside its window.
+    if(surround_image && pan) forward_instruments = surround_art->forward_panel();
+    auto &gauges{forward_instruments ? *forward_instruments : frame};
+    int const x{forward_instruments ? 0 : -origin[0]}, y{forward_instruments ? 0 : -origin[1]};
+    lamps.draw(gauges, x, y);
+    clock.draw_retained(gauges, transitions.snapshot().other_page / 2, x, y);
+    reactor.draw(gauges, painted_reactor, x, y);
     instruments.painted(0, painted_throttle_boundary);
     painted_throttle_boundary.reset();
-    throttle.draw_retained_at(frame, painted_speed, instruments.at(0).painted_thumb, x, y);
+    throttle.draw_retained_at(gauges, painted_speed, instruments.at(0).painted_thumb, x, y);
     auto const &shield_state{painted_shields};
     // 392d0 dirties the instrument only when one of these three values changes;
     // only its first repaint (391ee) uploads the six shield DAC entries.
@@ -927,7 +1027,7 @@ void mission_view::draw() {
       update_shield_colours(colours, shield_state[0], shield_state[1]);
       display_device.changed(80, 6);
     }
-    shields.draw(frame, painted_shields[2], {std::to_underlying(instruments.at(1).face), std::to_underlying(instruments.at(2).face)}, x, y);
+    shields.draw(gauges, painted_shields[2], {std::to_underlying(instruments.at(1).face), std::to_underlying(instruments.at(2).face)}, x, y);
     for(auto const &binding : weapon_controls) {
       auto const &row{painted_weapon_rows.at(binding.row)};
       std::optional<int> boundary;
@@ -935,26 +1035,28 @@ void mission_view::draw() {
         instruments.painted(*binding.slider);
         boundary = instruments.at(*binding.slider).boundary;
       }
-      weapons.draw_retained(frame, row.control_number, row.kind, row.name, row.state, std::to_underlying(instruments.at(binding.button).face), boundary, x, y);
+      weapons.draw_retained(gauges, row.control_number, row.kind, row.name, row.state, std::to_underlying(instruments.at(binding.button).face), boundary, x, y);
     }
     std::array<unsigned int, 5> faces;
     for(size_t i{0}; i < faces.size(); ++i) faces[i] = std::to_underlying(instruments.at(weapon_groups[i]).face);
-    weapons.draw_groups(frame, session->player_weapon_controls().current_group(), faces, x, y);
-    navigation.draw(frame, x, y);
-    displays->draw(frame, instruments, x, y);
-    hdd->draw(frame, instruments, x, y);
+    weapons.draw_groups(gauges, session->player_weapon_controls().current_group(), faces, x, y);
+    navigation.draw(gauges, x, y);
+    displays->draw(gauges, instruments, x, y);
+    hdd->draw(gauges, instruments, x, y);
     if(auto const marker{session->target_marker()}) {
       auto camera_transform{rotation_transform(camera.angles)};
       camera_transform.translation = camera.position;
-      if(auto const brackets{target_brackets(*marker, inverse_transform(camera_transform), view.projection)}) {
+      if(auto const brackets{target_brackets(*marker, inverse_transform(camera_transform), hud_projection)}) {
         scoped_framebuffer_clip target_clip{frame, &mask};
         draw_target_brackets(frame, *brackets, marker->locked, marker->side);
+        if(surround_image) draw_side_target_brackets(*surround_image, central_area, *brackets, marker->locked, marker->side);
       }
     }
-    waypoints.draw(frame, player.body().movement().position, player.body().movement().angles.z, navigation.display_heading(), session->next_waypoint(), x, y);
+    waypoints.draw(gauges, player.body().movement().position, player.body().movement().angles.z, navigation.display_heading(), session->next_waypoint(), x, y);
     // 35060 paints the ATT label after every HUD child, including waypoints.
-    if(session->player_weapon_controls().auto_tracking()) navigation.draw_tracking(frame, x, y);
+    if(session->player_weapon_controls().auto_tracking()) navigation.draw_tracking(gauges, x, y);
   }
+  if(surround_image) paint_sides(*surround_image);
   if(!inside && !options_camera) {
     std::string target;
     if(camera_actor() != session->player_id()) {
@@ -977,6 +1079,7 @@ void mission_view::draw() {
     // The original +88/+8c pair is swapped after scanout; the actual
     // driver draw selector (+3c) then targets the other page.
     surface.store(frame, page_x, page_y);
+    if(wide && inside && !presentation.prepared) previous_cockpit = frame;
   }
   auto const next_weapon_rows{session->player_weapon_controls().displays()};
   painted_weapon_rows.assign(next_weapon_rows.begin(), next_weapon_rows.end());

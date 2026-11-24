@@ -42,9 +42,21 @@ struct render_size {
     int const x{(width - w) / 2}, y{(height - h) / 2};
     return {x, y, x + w - 1, y + h - 1};
   }
+  // When panning left or right, stop at the outer edge of the three cockpit pages.
+  rectangle cockpit_panel(int pan) const {
+    auto panel{fit({})};
+    int const available{pan < 0 ? panel.left : width - panel.right - 1};
+    int const offset{std::clamp(pan, -320, 320) * std::min(available, panel.width()) / 320};
+    panel.left += offset;
+    panel.right += offset;
+    return panel;
+  }
   render_size artwork_size() const {
     auto const area{fit({})};
     return {area.width(), area.height()};
+  }
+  render_size mission_size() const {
+    return {width, artwork_size().height};
   }
 };
 }

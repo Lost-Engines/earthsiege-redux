@@ -33,6 +33,7 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 ## Game improvements
 
 - The 3D world and briefing map render at your window's resolution. The cockpit and menus keep their original pixel art.
+- Widescreen cockpits use the HERC's original side panels. A wider window reveals more terrain through the side glass, and you can adjust the field of view.
 - Models stay detailed and visible ten times farther away by default. You can adjust detail and draw distance independently.
 - Fog fades textures, dark gun barrels and muzzle flashes on distant models. HERC shadows fade with the machines that cast them.
 - Hits can throw more debris. You can change how many pieces fly off and how many can be in the air at once.
@@ -46,6 +47,7 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 | Option | What it does |
 | --- | --- |
 | `--resolution WxH` | Set a fixed render size, such as `1920x1080`. Use `window` (the default) to follow the window size. |
+| `--fov DEGREES` | Set the horizontal field of view across the original 320×200 frame. The default is 64.01°. Use 10 to 170, for example `--fov 85`. Widescreen adds to either side. |
 | `--scale N` | Set the initial window size to a multiple of 320×200. |
 | `--lod-distance-multiplier N` | Set how far away models switch to simpler shapes. Default 10. Use 1 for the DOS distances. |
 | `--distance-cutoff-multiplier N` | Set how far you can see HERCs, buildings and terrain models. Default 10. Use 1 for the DOS distances. |

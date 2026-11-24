@@ -140,13 +140,14 @@ void window::draw(framebuffer const &frame, palette const &colours, software_cur
   glfwGetFramebufferSize(handle.get(), &width, &height);
   if(width <= 0 || height <= 0) return;
   auto const canvas{resolution()};
-  auto const area{viewport::fit(width, height, canvas)};
-  std::optional<framebuffer> marked;
+  cockpit_pan = frame.cockpit_pan();
+  auto const area{viewport::fit(width, height, canvas, frame.has_surround())};
+  std::array<int, 2> position{};
   if(cursor && focused() && glfwGetWindowAttrib(handle.get(), GLFW_HOVERED)) {
-    auto const p{pointer_position()};
-    if(p[0] >= 0 && p[0] < 320 && p[1] >= 0 && p[1] < 200) cursor->draw(marked.emplace(frame), p[0], p[1]);
-  }
-  presenter->bind(marked ? *marked : frame, colours, canvas.artwork_size(), area, height);
+    position = pointer_position();
+    if(position[1] < 0 || position[1] >= 200 || (!frame.has_surround() && (position[0] < 0 || position[0] >= 320))) cursor = nullptr;
+  } else cursor = nullptr;
+  presenter->bind(frame, colours, frame.has_surround() ? canvas.mission_size() : canvas.artwork_size(), area, height, cursor, position);
   glViewport(0, 0, width, height);
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
@@ -187,7 +188,7 @@ auto window::logical_position(double x, double y) const->std::array<int, 2> {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  return viewport::fit(bw, bh, resolution()).logical(x, y, width, height, bw, bh);
+  return viewport::fit(bw, bh, resolution(), false, cockpit_pan).logical(x, y, width, height, bw, bh);
 }
 void window::warp_mouse(int x, int y) {
   int width{0};
@@ -196,7 +197,7 @@ void window::warp_mouse(int x, int y) {
   int bh{0};
   glfwGetWindowSize(handle.get(), &width, &height);
   glfwGetFramebufferSize(handle.get(), &bw, &bh);
-  auto const p{viewport::fit(bw, bh, resolution()).cursor(x, y, width, height, bw, bh)};
+  auto const p{viewport::fit(bw, bh, resolution(), false, cockpit_pan).cursor(x, y, width, height, bw, bh)};
   glfwSetCursorPos(handle.get(), p[0], p[1]);
 }
 void window::pump_events() {

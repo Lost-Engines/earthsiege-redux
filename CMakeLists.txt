@@ -306,6 +306,8 @@ add_library(earthsiege_core
   src/render/bitmap_raster.h
   src/render/line_raster.cpp
   src/render/line_raster.h
+  src/render/cockpit_surround.cpp
+  src/render/cockpit_surround.h
   src/render/model_renderer.cpp
   src/render/model_renderer.h
   src/render/gouraud_raster.cpp
@@ -1416,6 +1418,9 @@ if(BUILD_TESTING)
  add_executable(cockpit_pan_test tests/cockpit_pan_test.cpp)
  target_link_libraries(cockpit_pan_test PRIVATE earthsiege_core)
  add_test(NAME cockpit_pan COMMAND cockpit_pan_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/cockpit_pan.bin ${CMAKE_CURRENT_SOURCE_DIR}/assets)
+ add_executable(cockpit_surround_test tests/cockpit_surround_test.cpp)
+ target_link_libraries(cockpit_surround_test PRIVATE earthsiege_core)
+ add_test(NAME cockpit_surround COMMAND cockpit_surround_test "${PROJECT_SOURCE_DIR}/assets" "${PROJECT_SOURCE_DIR}/assets/expansion")
 endif()
 
 if(BUILD_TESTING)
@@ -1495,7 +1500,7 @@ if(BUILD_TESTING)
   if(EARTHSIEGE_TEST_WINDOW)
     add_executable(platform_window_test tests/platform_window_test.cpp src/platform/window.cpp src/platform/indexed_display.cpp)
     target_link_libraries(platform_window_test PRIVATE earthsiege_core glfw OpenGL::GL)
-    add_test(NAME platform_window COMMAND platform_window_test)
+    add_test(NAME platform_window COMMAND platform_window_test "${PROJECT_SOURCE_DIR}/assets")
   endif()
 endif()
 

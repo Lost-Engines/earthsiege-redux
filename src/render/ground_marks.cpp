@@ -45,7 +45,9 @@ void ground_marks::draw(framebuffer &target, vec3<int32_t> const &position, vec3
     if(camera.y <= projection.near_distance) continue;
     auto const screen{project_point(camera, projection, projection_source::model)};
     auto stamp{[&](int x, int y, int c){
-      auto cell{projection.output.from_logical({x, y, x, y})};
+      auto cell{projection.plane.pixels({x, y, x, y}, projection.output)};
+      auto const edge_x{projection.plane.x_edge(0, projection.output)}, edge_y{projection.plane.y_edge(0, projection.output)};
+      cell = {cell.left - edge_x, cell.top - edge_y, cell.right - edge_x, cell.bottom - edge_y};
       cell = {screen.x + cell.left, screen.y + cell.top, screen.x + cell.right, screen.y + cell.bottom};
       target.fill(cell.intersect(bounds), static_cast<uint8_t>(c));
     }};

@@ -16,16 +16,17 @@ void environment_renderer::draw(framebuffer &target, vec3<int32_t> const &positi
    .projection_shift{projection.perspective_shift},
    .centre{vec2<int32_t>{projection.centre}},
    .offset{vec2<int32_t>{offset}},
-   .bounds{bounds}
+   .bounds{bounds},
+   .plane{projection.plane}
  };
   bool const textured{detail.ground > 240 && detail.ground_texture};
   auto bands{make_background_bands(environment, view, !textured)};
-  draw_background_bands(target, bands, bounds);
+  draw_background_bands(target, bands, bounds, projection.plane);
   if(textured) texture.draw(target, position, angles, view, bands);
-  if(detail.panorama) draw_panorama(target, horizon, place_panorama(horizon, bands, view, angles.z, environment.background.horizon_offset), bounds);
+  if(detail.panorama) draw_panorama(target, horizon, place_panorama(horizon, bands, view, angles.z, environment.background.horizon_offset), bounds, projection.plane);
   auto raster_projection{projection};
   raster_projection.output = target.size();
-  auto const raster_bounds{target.size().from_logical(bounds)};
+  auto const raster_bounds{projection.plane.clip_bounds(bounds, target.size())};
   clouds.draw(target, position, angles, raster_projection, raster_bounds, detail.clouds, random);
   marks.draw(target, position, angles, raster_projection, raster_bounds, detail.ground, random);
   reflection.update(colours, angles.x, reflection_enabled, impact);

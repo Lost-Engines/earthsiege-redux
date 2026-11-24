@@ -5,6 +5,7 @@
 #include "audio/mission_audio.h"
 #include "render/clock_instrument.h"
 #include "render/cockpit_pan.h"
+#include "render/cockpit_surround.h"
 #include "render/environment_renderer.h"
 #include "render/external_view.h"
 #include "render/instrument_bars.h"
@@ -54,7 +55,10 @@ class mission_view {
   framebuffer world_target;
   render_size scene_size;
   double lod_distance_multiplier;
+  double camera_zoom;
   cockpit_artwork cockpit;
+  std::optional<cockpit_surround> surround_art;
+  std::optional<framebuffer> previous_cockpit;
   reactor_gauge reactor;
   throttle_gauge throttle;
   shield_instruments shields;
@@ -106,6 +110,8 @@ class mission_view {
   void update_interface_clock(uint32_t now);
   cockpit_impact_view impact_view() const;
   std::array<int32_t, 2> instrument_origin() const;
+  std::array<int32_t, 2> gauge_origin(std::array<int32_t, 2> origin) const;
+  void update_displays(std::array<int32_t, 2> origin);
   environment_renderer environment;
   earthsiege::environment_detail detail;
   scenery_renderer renderer;
@@ -256,9 +262,11 @@ public:
   void end_options();
   void draw();
   void render_resolution(render_size canvas) {
-    auto const size{canvas.artwork_size()};
-    if(size != scene_size) surface.reset_detail();
-    scene_size = size;
+    if(canvas != scene_size) {
+      surface.reset_detail();
+      previous_cockpit.reset();
+      scene_size = canvas;
+    }
   }
   void environment_detail(bool horizon, uint8_t cloud, uint8_t ground) {
     detail = {horizon, cloud, ground, true};

@@ -48,6 +48,7 @@ class window {
   std::unique_ptr<GLFWwindow, decltype(&glfwDestroyWindow)> handle{nullptr, glfwDestroyWindow};
   std::unique_ptr<indexed_display> presenter;
   int max_texture_size{0};
+  int cockpit_pan{0};
   std::optional<render_size> fixed_resolution;
   mutable render_size last_drawable{};
   std::deque<window_event> events;

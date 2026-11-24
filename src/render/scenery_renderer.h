@@ -53,6 +53,7 @@ struct view_distances {
   double lod{10.0};
   double cutoff{10.0};
   scene_shading shading{scene_shading::distance};
+  double zoom{1};
 };
 
 struct scene_draw_observation {

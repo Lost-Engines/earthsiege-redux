@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -54,6 +55,19 @@ auto main(int const argc, char **argv)->int try {
   earthsiege::camera_projection enlarged{.output{640, 400}};
   auto const fine{earthsiege::project_point({1, 512, 1}, enlarged, earthsiege::projection_source::model)};
   if(fine != vec2<int32_t>{321, 199}) throw std::runtime_error{"lost subpixel geometry before output projection"};
+  for(auto const size : {earthsiege::render_size{640, 400}, {800, 400}, {1279, 419}}) {
+    auto const panel{size.fit({})};
+    earthsiege::camera_projection camera{.centre{160, 72}, .output{size}};
+    camera.plane = earthsiege::projection_plane::cockpit(size, camera.centre, earthsiege::cockpit_fov_zoom(90));
+    auto const point{[&](int x, int y, int z){return earthsiege::project_point({x,y,z}, camera, earthsiege::projection_source::model);}};
+    if(point(-1024,1024,0).x != panel.left || point(1024,1024,0).x != panel.right + 1 ||
+       point(0,1024,0).y != std::lround(72.0 * size.height / 200)) throw std::runtime_error{"90-degree field or reticle alignment differs"};
+    std::array<earthsiege::camera_vertex, 3> const tri{{
+      {{0, 128, 0}, {}, 0}, {{256, 384, 0}, {}, 0}, {{0, 384, 128}, {}, 0},
+    }};
+    auto const clipped{earthsiege::project_polygon(tri, camera, earthsiege::projection_source::model)};
+    if(clipped.size() != 4 || clipped[1].position != point(128,256,0)) throw std::runtime_error{"near-plane intersection ignores the field of view"};
+  }
   std::cout << cases << " native polygon projections and clipped texture/shade attributes agree" << std::endl;
   return EXIT_SUCCESS;
 } catch(std::exception const &error) {

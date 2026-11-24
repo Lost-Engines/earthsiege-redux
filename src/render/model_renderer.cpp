@@ -1,5 +1,6 @@
 #include "model_renderer.h"
 #include <algorithm>
+#include <cmath>
 #include <numeric>
 #include <stdexcept>
 #include <type_traits>
@@ -252,10 +253,13 @@ class model_draw {
     vec2<int32_t> const size{scaled(static_cast<int32_t>(texture.width)), scaled(static_cast<int32_t>(texture.height))};
     if(size.x >= 200 || size.y >= 200) return;
     auto const output{view.projection.output};
-    position.x -= render_size::edge(scaled(source.offset.x), output.width, 320);
-    position.y -= render_size::edge(scaled(source.offset.y), output.height, 200);
+    auto const &plane{view.projection.plane};
+    auto const width{[&](int n){return plane.x_edge(n, output) - plane.x_edge(0, output);}};
+    auto const height{[&](int n){return plane.y_edge(n, output) - plane.y_edge(0, output);}};
+    position.x -= width(scaled(source.offset.x));
+    position.y -= height(scaled(source.offset.y));
     draw_scaled_bitmap(target, texture, vec2<int32_t>{position},
-                       {render_size::edge(size.x, output.width, 320), render_size::edge(size.y, output.height, 200)}, view.bounds);
+                       {width(size.x), height(size.y)}, view.bounds);
   }
 
 public:
@@ -315,6 +319,22 @@ int classify_model_bounds(part_header const &header, model_transform const &tran
   camera_projection const &projection, rectangle const &bounds, bool const rectangular_clip) {
   auto point{transform_point(header.centre, transform)};
   if(wrap_long(static_cast<int64_t>(point.y) + header.radius) <= projection.near_distance) return 0;
+  if(projection.plane != projection_plane{} && projection.perspective_shift) {
+    // Test the sphere against each plane of the off-centre viewing frustum.
+    double const focal{static_cast<double>(1u << projection.perspective_shift)};
+    bool contained{point.y - int64_t{header.radius} > projection.near_distance};
+    auto const inside{[&](double lateral, double slope) {
+      double const distance{lateral - slope * point.y};
+      double const allowance{header.radius * std::hypot(1.0, slope)};
+      if(distance <= allowance) contained = false;
+      return distance >= -allowance;
+    }};
+    if(!inside(point.x, (bounds.left - projection.centre.x) / focal) ||
+       !inside(-double(point.x), (projection.centre.x - bounds.right - 1) / focal) ||
+       !inside(point.z, (projection.centre.y - bounds.bottom - 1) / focal) ||
+       !inside(-double(point.z), (bounds.top - projection.centre.y) / focal)) return 0;
+    return rectangular_clip && contained ? 2 : 1;
+  }
   int32_t width{projection.centre.x};
   if(width < 0) width = wrap_long(static_cast<int64_t>(bounds.right) + bounds.left - projection.centre.x);
   auto const cosine{model_cosine(direction_angle(1 << projection.perspective_shift, width))};
@@ -348,7 +368,7 @@ void model_renderer::draw(model_part const &source, model_instance const &instan
   if(view.cull_bounds && !classify_model_bounds(source.header, compose_transforms(object, view.camera), view.projection, view.bounds, false)) return;
   auto raster_view{view};
   raster_view.projection.output = target.size();
-  raster_view.bounds = target.size().from_logical(view.bounds);
+  raster_view.bounds = view.projection.plane.clip_bounds(view.bounds, target.size());
   model_light_cache cache{lights, object, instance.transforms().size()};
   surface_colours const paints{colours, authored_colours, fog ? fog->textures : texture_shades, fog, ground_blend};
   model_draw{target, paints, instance, object, raster_view, textures, lights, instance.cell_frames(), attachments, cache}.part(source);

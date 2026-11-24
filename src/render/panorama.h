@@ -11,5 +11,5 @@ struct panorama_placement {
   bool rotated{false};
 };
 std::vector<panorama_placement> place_panorama(std::span<bitmap const>, background_bands const &, background_view const &, uint16_t heading, int horizon_offset);
-void draw_panorama(framebuffer &, std::span<bitmap const>, std::span<panorama_placement const>, rectangle bounds);
+void draw_panorama(framebuffer &, std::span<bitmap const>, std::span<panorama_placement const>, rectangle bounds, projection_plane const &plane = {});
 } // namespace earthsiege

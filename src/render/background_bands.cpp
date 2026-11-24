@@ -1,5 +1,6 @@
 #include "background_bands.h"
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 #include "render/polygon_raster.h"
@@ -25,7 +26,8 @@ void bands(background_bands &result, background_view const &view, int32_t const 
   auto first{result.horizon[0]};
   auto second{result.horizon[1]};
   auto const &direction{result.horizon[2]};
-  if(sky ? first.y < view.bounds.top && second.y < view.bounds.top : first.y > view.bounds.bottom && second.y > view.bounds.bottom) return;
+  if((view.roll == 0 || view.plane == projection_plane{}) &&
+     (sky ? first.y < view.bounds.top && second.y < view.bounds.top : first.y > view.bounds.bottom && second.y > view.bounds.bottom)) return;
   auto colour{first_colour + count - 1};
   int const sign{sky ? 1 : -1};
   auto const dx{multiply_shift(-direction.x, step, 14)};
@@ -58,6 +60,17 @@ void bands(background_bands &result, background_view const &view, int32_t const 
     if(first.y <= second.y) append(result, background_primitive_kind::rectangle, colour, {vec2<int32_t>{first}, vec2<int32_t>{second}});
     return;
   }
+  auto const kind{sky ? background_primitive_kind::sky_polygon : background_primitive_kind::ground_polygon};
+  auto const finish_wide_strip{[&] {
+    // Extend the last band past every corner along its normal, even at high zoom-out.
+    int const cx{(first.x + second.x) / 2}, cy{(first.y + second.y) / 2};
+    double const reach{2.0 + std::max(std::abs(view.bounds.left - cx), std::abs(view.bounds.right - cx)) +
+                         std::max(std::abs(view.bounds.top - cy), std::abs(view.bounds.bottom - cy))};
+    int const dx_far{static_cast<int>(std::lround(-direction.x * sign * reach / 16384.0))};
+    int const dy_far{static_cast<int>(std::lround(direction.y * sign * reach / 16384.0))};
+    append(result, kind, colour, {vec2<int32_t>{first}, vec2<int32_t>{second},
+                                 {second.x + dx_far, second.y + dy_far}, {first.x + dx_far, first.y + dy_far}});
+  }};
   if(sky && expansion) {
     // Expansion 292b0 starts the rolled sky strip two steps below the
     // horizon, then calculates each edge from the unrounded direction.
@@ -77,12 +90,12 @@ void bands(background_bands &result, background_view const &view, int32_t const 
       second = right;
       --colour;
     }
+    if(view.plane != projection_plane{}) { finish_wide_strip(); return; }
     auto const ox{multiply_shift(direction.x, -1000, 14)};
     auto const oy{multiply_shift(direction.y, 1000, 14)};
     append(result, background_primitive_kind::sky_polygon, colour, {vec2<int32_t>{first}, vec2<int32_t>{second}, vec2<int32_t>{first.x + ox, first.y + oy}, vec2<int32_t>{second.x + ox, second.y + oy}});
     return;
   }
-  auto const kind{sky ? background_primitive_kind::sky_polygon : background_primitive_kind::ground_polygon};
   for(int32_t index{0}; index < count - 1; ++index) {
     vec2<int32_t> const next_first{first.x + sign * dx, first.y + sign * initial_dy};
     vec2<int32_t> const next_second{second.x + sign * dx, second.y + sign * initial_dy};
@@ -92,6 +105,7 @@ void bands(background_bands &result, background_view const &view, int32_t const 
     second = next_second;
     --colour;
   }
+  if(view.plane != projection_plane{}) { finish_wide_strip(); return; }
   std::vector<vec2<int32_t>> points{vec2<int32_t>{first}, vec2<int32_t>{second}};
   vec2<int32_t> const top_left{view.bounds.left, view.bounds.top};
   vec2<int32_t> const bottom_right{view.bounds.right, view.bounds.bottom};
@@ -144,6 +158,18 @@ background_bands make_background_bands(world_environment const &environment, bac
     result.horizon[index].x += scroll_x + view.offset.x;
     result.horizon[index].y += scroll_y + view.offset.y + (style.horizon_offset >> 1);
   }
+  if(view.plane != projection_plane{}) {
+    // Extend the horizon in both directions across the complete visible plane.
+    // Side views share this horizon with the front glass as the cockpit pans.
+    int const cx{view.centre.x + offset_x};
+    int const cy{view.centre.y - offset_y + style.horizon_offset + (style.horizon_offset >> 1)};
+    double const reach{1.0 + std::max(std::abs(view.bounds.left - cx), std::abs(view.bounds.right - cx)) +
+                          std::max(std::abs(view.bounds.top - cy), std::abs(view.bounds.bottom - cy))};
+    int const rx{static_cast<int>(std::ceil(reach * cosine / 16384.0))};
+    int const ry{static_cast<int>(std::ceil(reach * sine / 16384.0))};
+    result.horizon[0] = {cx - rx, cy + ry};
+    result.horizon[1] = {cx + rx, cy - ry};
+  }
   /// The original signed upper-limit comparison can never invert a zero-extended pitch
   result.horizon[2] = vec2<int32_t>{sine, -cosine};
   bands(result, view, style.sky_palette_start, style.sky_bands, style.sky_step, style.horizon_band_width, true, environment.edition == game_edition::expansion);
@@ -153,21 +179,21 @@ background_bands make_background_bands(world_environment const &environment, bac
   return result;
 }
 
-void draw_background_bands(framebuffer &target, background_bands const &source, rectangle const bounds) {
+void draw_background_bands(framebuffer &target, background_bands const &source, rectangle const bounds, projection_plane const &plane) {
   for(auto const &primitive : source.primitives) {
     auto const colour{static_cast<uint8_t>(primitive.colour)};
     if(primitive.kind == background_primitive_kind::rectangle) {
       auto const &first{primitive.points.at(0)};
       auto const &second{primitive.points.at(1)};
-      target.fill(target.size().from_logical({std::max(first.x, bounds.left), std::max(first.y, bounds.top), std::min(second.x, bounds.right), std::min(second.y, bounds.bottom)}), colour);
+      target.fill(plane.pixels({std::max(first.x, bounds.left), std::max(first.y, bounds.top), std::min(second.x, bounds.right), std::min(second.y, bounds.bottom)}, target.size()), colour);
     } else {
       auto points{primitive.points};
       if(primitive.kind == background_primitive_kind::sky_polygon) std::ranges::reverse(points);
       for(auto &p : points) {
-        p.x = render_size::edge(p.x, target.size().width, 320);
-        p.y = render_size::edge(p.y, target.size().height, 200);
+        p.x = plane.x_edge(p.x, target.size());
+        p.y = plane.y_edge(p.y, target.size());
       }
-      draw_solid_polygon(target, points, target.size().from_logical(bounds), colour, polygon_winding::preserve);
+      draw_solid_polygon(target, points, plane.clip_bounds(bounds, target.size()), colour, polygon_winding::preserve);
     }
   }
 }
