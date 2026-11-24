@@ -3,6 +3,7 @@
 #include <vector>
 #include "resources/combat.h"
 #include "resources/player_roster.h"
+#include "simulation/mission_rules.h"
 
 namespace earthsiege {
 
@@ -25,7 +26,7 @@ struct damage_state {
 };
 
 /// Mutate signed-word accumulation and remaining damage; negative accumulation means destroyed
-bool accumulate_damage(int16_t &amount, int16_t capacity, int16_t &current, game_edition edition = game_edition::original);
+bool accumulate_damage(int16_t &amount, int16_t capacity, int16_t &current, mission_rules rules = mission_rules::redux);
 
 using component_choice = std::function<int16_t(int16_t)>;
 using section_detachment = std::function<void(size_t)>;
@@ -34,13 +35,13 @@ using section_detachment = std::function<void(size_t)>;
 class component_damage {
   damage_definition const &definition;
   damage_state current;
-  game_edition edition;
+  mission_rules rules;
   bool distribute(size_t section, int16_t amount, component_choice const &choose);
   void remove(size_t section, component_choice const &choose, section_detachment const &detach, std::vector<size_t> &pending, std::vector<size_t> &removed);
   void update_consequences(int16_t legs);
 
 public:
-  component_damage(damage_definition const &definition, damage_state initial, game_edition edition = game_edition::original);
+  component_damage(damage_definition const &definition, damage_state initial, mission_rules rules = mission_rules::redux);
   std::vector<size_t> hit(size_t section, int16_t amount, int16_t legs, component_choice const &choose, section_detachment const &detach = {});
   /// Raw section damage shared by HERCs and flyers, without HERC-specific consequences.
   std::vector<size_t> apply_section(size_t section, int16_t amount, component_choice const &choose, section_detachment const &detach = {});

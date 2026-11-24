@@ -13,7 +13,7 @@ Earthsiege Redux builds on the native C++26 reconstruction of **Metaltech: Earth
 
 The March 1995 CD expansion is included alongside the original game. The launcher offers a choice of editions; `--original` and `--expansion` start either directly. Both battlesets, career transfer, Apocalypse, the new enemies and weapons, deployment pods, environments, music and CD cinematics are connected. All four expansion demos now match the original player motion and gameplay RNG throughout; the [replay audit](docs/DEMO_REPLAY.md) covers 11,071 simulation updates. [Expansion integration](docs/EXPANSION.md) describes the original-code comparisons and the limits of that coverage. The 1996 base-game reissue has unchanged 1.0 game files.
 
-The local suite passed 310 tests, including the Linux window check and four complete original recordings whose gameplay states and return files match. The [validation report](docs/VALIDATION.md) describes the original-executable comparisons and remaining presentation and audio timing differences.
+The Linux test suite replays all eight shipped demos. For the four retail recordings it also compares the mission results and campaign variables byte for byte. See the [validation report](docs/VALIDATION.md).
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -54,6 +54,22 @@ In DOS, a distant building could lose its silhouette in the haze while its paint
 
 Both editions use the expansion's shield gauge. An empty front or rear shield goes black. As it recharges, one green band appears first. The other two start to light above 25% and 37.5% charge. The numbers beside the gauge show the requested front and rear allocation.
 
+The recharge cap follows the edition you launch. With enough reactor power, a HERC regains up to four shield points per simulation update in the original and five in the expansion, even on a chassis available in both. The original armory takes recovered weapons in their surviving condition. The expansion returns eligible weapons at 100% and excludes the three Cybrid-only types.
+
+### Map and wingmate orders
+
+Both campaigns open the cockpit on the scanner. Contacts turn with the HERC's torso, using the correction from the floppy expansion and the April patch. The lower tactical map fits its zoom range to the mission area and scales the pan step with zoom. You can assign an attack or defence beyond the scanner's selected range.
+
+Give a wingmate DEFEND on a friendly HERC and they follow it as it moves. Click open ground and they guard that spot, even if the previous order named a HERC. Wingmates steer clear of your firing line. While following you, they remember whether you gave the order to fire at will or hold fire when deciding whether to look for enemies. A wingmate guarding a mission objective considers the distance to that objective when deciding whether to give chase. Coming under fire can prompt retaliation while preserving an explicit order.
+
+HERCs use the expansion's steering when backing away from an obstruction or closing on a flyer. Automatic aiming stops when the torso or guns reach the target angle. The radio uses the April patch's fix for an interrupted transmission so the next call can start.
+
+### Projectile timing and armour penetration
+
+Ordinary bullets in both campaigns use elapsed simulation time for their lifetime. In retail DOS a bullet spent one unit of lifetime on every update, even when that update moved it only a fraction of its usual distance. The expansion clock keeps its range consistent across short and long updates.
+
+When a hit breaks armour, the next component takes the excess. With 10 points of armour left, a 15-point hit passes 5 points inward, and a 75-point hit passes 65. Expansion DOS passed **-10** in both cases. The damage system reads a negative component value as destroyed, so even a hit that barely pierced armour could take off a leg. Redux uses the full sum before subtracting the armour capacity.
+
 ### Impact fragments
 
 `--fragment-count-multiplier N` scales the maximum number of loose pieces thrown by each impact burst. At the Redux default of `4`, hits can throw from zero to 8, 16 or 24 pieces, depending on the damage. Fractions round the maximum down. At `0`, hits can still knock a weapon off its mount.
@@ -70,7 +86,7 @@ To play with the original debris density, use the DOS limits.
 
 Redux seeds a standard C++ Mersenne Twister (`std::mt19937`) from `std::random_device` for interactive play. Mission choices, AI decisions, combat and particle bursts draw from it. Replaying the same mission can give you different opponents, shots and damage rolls wherever the game calls for chance.
 
-The eight shipped demos record the pilot's controls. A different combat roll can destroy a HERC the pilot was about to shoot, so tape playback uses the DOS sequence. Both fragment settings work during playback and preserve the recorded action. Taking control with `--inspect-demo` uses Redux randomness.
+The eight shipped demos record the pilot's controls. A different combat roll can destroy a HERC the pilot was about to shoot, so playback uses the original random sequence and the recording's map, orders, projectile clock and damage arithmetic. Both fragment settings work during playback. With `--inspect-demo` you fly the same starting mission under live Redux rules.
 
 Options → View Demo picks one of the four recordings for the selected edition at random. Use `--demo N` (1-4) to choose one yourself.
 

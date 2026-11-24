@@ -61,7 +61,7 @@ void guide_plasma(projectile_flight &state, projectile_guidance &input, frame_ra
 
 } // anonymous namespace
 
-projectile_result advance_projectile(projectile_flight &state, projectile_motions const &motions, int16_t const speed_limit, std::span<uint16_t const> const cell_counts, frame_ratio const ratio, projectile_guidance &guidance, projectile_contact const &contact) {
+projectile_result advance_projectile(projectile_flight &state, projectile_motions const &motions, int16_t const speed_limit, std::span<uint16_t const> const cell_counts, frame_ratio const ratio, projectile_guidance &guidance, projectile_contact const &contact, mission_rules const rules) {
   int16_t lifetime;
   int16_t radius;
   int16_t period;
@@ -91,8 +91,9 @@ projectile_result advance_projectile(projectile_flight &state, projectile_motion
       state.cells[cell] = static_cast<uint16_t>((state.cells[cell] + 1U) % cell_counts[cell]);
     }
   }
-  bool const scaled_age{state.kind == projectile_kind::bullet && motions.edition == game_edition::expansion};
-  state.age = wrap_word(state.age + (scaled_age ? scale_frame_time(512, ratio) : 1));
+  bool const scaled_age{state.kind == projectile_kind::bullet && rules != mission_rules::retail_dos};
+  state.age += scaled_age ? scale_frame_time(512, ratio) : 1;
+  if(rules != mission_rules::redux) state.age = wrap_word(state.age);
   if(state.age > (scaled_age ? lifetime * 512 : lifetime)) {
     if(state.kind == projectile_kind::rocket && state.subtype == rocket_manual_subtype) guidance.manual_held = false;
     return projectile_result::expired;

@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include "simulation/mission_rules.h"
 #include "simulation/radio_queue.h"
 
 namespace earthsiege {
@@ -18,9 +19,11 @@ struct radio_presentation_callbacks {
 /// Original active-message consumer. Portrait/speech completion and the ability
 /// to paint during camera transitions are explicit presentation callbacks.
 class radio_controller {
+  mission_rules rules;
   radio_queue messages;
   radio_presentation_state data;
 public:
+  explicit radio_controller(mission_rules mode = mission_rules::redux) : rules{mode} {}
   radio_queue &queue();
   radio_queue const &queue() const;
   radio_presentation_state const &state() const;

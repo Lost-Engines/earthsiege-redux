@@ -25,7 +25,7 @@ int main(int argc, char **argv) try {
     c.side = f.integer<uint8_t>();
     contacts.push_back(c);
   }
-  tactical_controller controller;
+  tactical_controller controller{earthsiege::mission_rules::retail_dos};
   size_t row{0};
   auto const compare{[&]{
     auto const &s{controller.state()};

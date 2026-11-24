@@ -196,6 +196,12 @@ accumulators, 2,000 EMP recharge cases, 512 map pans, 20 controller definitions,
 24 invulnerability settings, 1,024 guard decisions and 2,304 flyer movement steps.
 The analysis project's `docs/DEMO_REPLAY.md` records addresses and the path plot.
 
+Expansion DEMO3 includes a plasma hit at update 1069. The DOS damage routine at
+`0xb2f8` passes the old accumulated damage minus capacity to the next component.
+The negative result costs the HERC a leg in the recording. Live Redux adds the
+incoming hit before subtracting capacity. Playing the tape uses the shipped
+calculation, as the subsequent pilot inputs depend on that loss.
+
 ## Scope and remaining differences
 
 These fixtures check player motion and gameplay RNG throughout the recordings.

@@ -43,6 +43,7 @@ void radio_controller::advance(uint32_t const ticks, bool const text_enabled, ra
   auto const remove{[&]{
     messages.erase(0);
     data.active.reset();
+    if(rules == mission_rules::redux) data.starting = false;
     data.cancelling = false;
     data.ready = false;
   }};

@@ -44,8 +44,8 @@ void label(framebuffer &target, font const &face, std::string_view const text, r
   target.text(face, text, x, y);
 }
 } // anonymous namespace
-scanner_display::scanner_display(resource_store const &resources)
-  : expansion{resources.edition() == game_edition::expansion},
+scanner_display::scanner_display(resource_store const &resources, mission_rules const mode)
+  : rules{mode},
     background{read_bitmaps(resources.read("simvol0", "dba/RADAR.DBA")).at(0)},
     fonts{read_font(resources.read("simvol0", "dfn/CPBLUE.DFN")),
           read_font(resources.read("simvol0", "dfn/CPGREEN.DFN")),
@@ -64,6 +64,8 @@ void scanner_display::draw(framebuffer &target, rectangle const &bounds, scanner
   label(target, fonts[state.radar_active ? 1 : 2], activity_labels[state.radar_active ? 0 : 1], {x + 1, y + 2, x + 15, y + 7}, 2);
   std::optional<vec2<int32_t>> selected;
   int32_t selected_distance{0};
+  // The corrected floppy scanner builds its own XY rotation once per paint.
+  auto const rotation{rules == mission_rules::redux ? rotation_transform({0, 0, state.heading}) : world_to_camera};
   for(auto const &contact : state.contacts) {
     if(!contact.active) continue;
     auto position{contact.position};
@@ -76,9 +78,8 @@ void scanner_display::draw(framebuffer &target, rectangle const &bounds, scanner
     if(distance == 0) distance = 1;
     if(distance >= state.range) continue;
     vec2<int32_t> projected;
-    if(expansion) {
-      // Expansion CD 0x3928c rotates the relative XY vector using the view matrix.
-      auto const rotated{rotate_vector({delta.x, delta.y, 0}, world_to_camera)};
+    if(uses_revised_tactics(rules)) {
+      auto const rotated{rotate_vector({delta.x, delta.y, 0}, rotation)};
       projected = {rotated.x, -rotated.y};
     } else {
       projected = retail_projection(delta, distance, state.heading);

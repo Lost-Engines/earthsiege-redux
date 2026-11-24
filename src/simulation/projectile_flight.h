@@ -7,6 +7,7 @@
 #include "resources/model.h"
 #include "resources/projectile_motion.h"
 #include "simulation/frame_time.h"
+#include "simulation/mission_rules.h"
 
 namespace earthsiege {
 
@@ -22,7 +23,7 @@ struct projectile_flight {
   vec3<int32_t> position;
   vec3<uint16_t> angles;
   int16_t speed{0};
-  int16_t age{0};
+  int32_t age{0};
   int16_t animation_remaining{0};
   std::vector<uint16_t> cells;
   bool target_present{false};
@@ -56,6 +57,6 @@ enum class projectile_result {
 using projectile_contact = std::function<bool(model_transform const &, int16_t, int16_t)>;
 
 /// Advance original cells, lifetime and guidance; dispatch the ray before committing movement
-projectile_result advance_projectile(projectile_flight &state, projectile_motions const &motions, int16_t speed_limit, std::span<uint16_t const> cell_counts, frame_ratio ratio, projectile_guidance &guidance, projectile_contact const &contact = {});
+projectile_result advance_projectile(projectile_flight &state, projectile_motions const &motions, int16_t speed_limit, std::span<uint16_t const> cell_counts, frame_ratio ratio, projectile_guidance &guidance, projectile_contact const &contact = {}, mission_rules rules = mission_rules::redux);
 
 } // namespace earthsiege

@@ -97,7 +97,7 @@ model_transform projectile_instance::placement() const {
   return result;
 }
 
-projectile_result projectile_instance::advance(frame_ratio const ratio, projectile_guidance &guidance, impact_query const &hit) {
+projectile_result projectile_instance::advance(frame_ratio const ratio, projectile_guidance &guidance, impact_query const &hit, mission_rules const rules) {
   auto const result{advance_projectile(flight_state, motions, source.speed, cell_counts, ratio, guidance, [&](model_transform const &transform, int16_t const reach, int16_t const radius){
     if(!hit) return false;
     auto damage{projectile_payload(source, damage_scale)};
@@ -113,7 +113,7 @@ projectile_result projectile_instance::advance(frame_ratio const ratio, projecti
       hit({transform, 0, 0, damage, 4000});
     }
     return struck;
-  })};
+  }, rules)};
   std::ranges::copy(flight_state.cells, visual.cell_frames().begin());
   return result;
 }

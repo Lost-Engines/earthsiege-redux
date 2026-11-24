@@ -8,6 +8,8 @@ cockpit_radio::cockpit_radio(resource_store const &source, cockpit_layout const 
   :resources{source},
     random{ui_random},
     catalogue{source},
+    controller{session.rules()},
+    system_controller{session.rules()},
     system_bounds{layout.bounds(0x694)},
     banner{source},
     labels{source},

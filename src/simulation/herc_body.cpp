@@ -10,7 +10,7 @@
 
 namespace earthsiege {
 
-herc_body::herc_body(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> const equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, sound_sink sink)
+herc_body::herc_body(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> const equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, sound_sink sink, mission_rules const rules)
   : source{definition},
     sounds{std::move(sink)},
     rig{std::get<shape_part>(definition.models.roots.front().content)},
@@ -18,8 +18,8 @@ herc_body::herc_body(herc_definition const &definition, weapon_catalogue const &
     movement_state{
       .position{vec3<int32_t>{position}},
       .angles{vec3<uint16_t>{angles}}
-    } {
-  expansion = weapons.edition == game_edition::expansion;
+    },
+    revised_controls{uses_revised_tactics(rules)} {
   body_channel = rig.add_channel(source.profile.movement.forward_stop_sequence);
   if(source.profile.torso.sequence >= 0) torso_channel = rig.add_channel(source.profile.torso.sequence);
   if(source.profile.elevation.sequence >= 0) elevation_channel = rig.add_channel(source.profile.elevation.sequence);
@@ -89,7 +89,7 @@ void herc_body::prepare_player_movement(int16_t const throttle, int16_t const st
     frame_movement_events.push_back(event);
     if(events) events(event);
   }};
-  if(update_player_movement(movement_state, source.profile.movement, rig.channel(body_channel), throttle, steering, damage, ratio, notify, expansion, direction_mode)) throttle_command_pending = true;
+  if(update_player_movement(movement_state, source.profile.movement, rig.channel(body_channel), throttle, steering, damage, ratio, notify, revised_controls, direction_mode)) throttle_command_pending = true;
 }
 void herc_body::reset_aim_angles() {
   torso_state.angle = 0;
@@ -121,10 +121,11 @@ void herc_body::prepare_requested(int16_t const speed, int16_t const steering, f
     frame_movement_events.push_back(event);
     if(events) events(event);
   }};
-  update_requested_movement(movement_state, source.profile.movement, rig.channel(body_channel), speed, steering, damage, ratio, notify, avoidance, expansion);
+  update_requested_movement(movement_state, source.profile.movement, rig.channel(body_channel), speed, steering, damage, ratio, notify, avoidance, revised_controls);
 }
 
-void herc_body::prepare_aim(vec2<int16_t> const &aim, frame_ratio const ratio, std::optional<vec2<int16_t>> const target) {
+void herc_body::prepare_aim(vec2<int16_t> const &aim, frame_ratio const ratio, std::optional<vec2<int16_t>> target) {
+  if(!revised_controls) target.reset();
   update_aim(torso_state, source.profile.torso, aim.x, ratio, target ? std::optional<int16_t>{target->x} : std::nullopt);
   if(sounds) sounds(servo_sound_request{0, aim.x, torso_state.angle});
   update_aim(elevation_state, source.profile.elevation, aim.y, ratio, target ? std::optional<int16_t>{target->y} : std::nullopt);

@@ -76,7 +76,7 @@ int main(int const argc, char **argv) try {
       ++queries;
       check_packet(file, request, "flight " + std::to_string(row));
       return hit ? std::optional<int32_t>{100} : std::nullopt;
-    })};
+    }, earthsiege::mission_rules::retail_dos)};
     if(queries != 1 || (outcome != earthsiege::projectile_result::flying) != done || projectile.flight().position != final_position) file.fail("flight result differs");
     if(!std::ranges::equal(projectile.model().cell_frames(), projectile.flight().cells)) file.fail("projectile visual cells differ");
   }

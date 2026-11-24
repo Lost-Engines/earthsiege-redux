@@ -16,8 +16,9 @@
 
 namespace earthsiege {
 
-mission_session::mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random, mission_counters initial_counters, fragment_settings fragments)
+mission_session::mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random, mission_counters initial_counters, fragment_settings fragments, mission_rules rules)
   : settings{script.header},
+    ruleset{rules},
     layout{resources},
     routes{script.routes},
     points{script.points},
@@ -29,9 +30,9 @@ mission_session::mission_session(resource_store const &resources, mission_script
     random{std::move(initial_random)},
     visual_random{random.fresh_stream()},
     effects{resources, [this](auto const &event){emit_sound(event);}, terrain.environment().atmosphere_parameters[1] != 0, fragments},
-    projectiles{resources, weapon_definitions, [this](auto const &event){emit_sound(event);}} {
+    projectiles{resources, weapon_definitions, [this](auto const &event){emit_sound(event);}, rules} {
   auto const placements{layout.place(script, roster, true)};
-  activity = std::make_unique<mission_activity>(script, placements, initial_counters, false, resources.edition() == game_edition::expansion);
+  activity = std::make_unique<mission_activity>(script, placements, initial_counters, false, revised_tactics());
   for(auto const &group : script.groups) deployment_modes.push_back(resources.edition() == game_edition::expansion && group.trigger >= 0 ? script.triggers.at(static_cast<size_t>(group.trigger)).test : 0);
   deployment_started.resize(script.groups.size());
   auto const names{read_resource_names(resources.read("simvol0", "nam/MECHS.NAM"))};
@@ -62,7 +63,7 @@ mission_session::mission_session(resource_store const &resources, mission_script
     // unresolved actor's original sentinel position. Place the complete roster later.
     crew_member member{
       .definition{definition.get()},
-      .actor{std::make_unique<herc_actor>(*definition, weapon_definitions, weapon_models, equipment, position, angles, values, actor.player_controlled ? sound_sink{[this](auto const &event){emit_sound(event);}} : sound_sink{})},
+      .actor{std::make_unique<herc_actor>(*definition, weapon_definitions, weapon_models, equipment, position, angles, values, actor.player_controlled ? sound_sink{[this](auto const &event){emit_sound(event);}} : sound_sink{}, rules)},
       .attachments{},
       .source{actor.source},
       .group{actor.group},
@@ -109,7 +110,7 @@ mission_session::mission_session(resource_store const &resources, mission_script
     if(!definition) definition = std::make_unique<flyer_definition>(read_flyer_definition(resources, flyer_names.at(static_cast<size_t>(placement.definition))));
     auto const side{placements.groups.at(placement.group).mode};
     enter_behavior(activity->decisions()[flyer_id(flyers.size())].controller, behavior::flyer_deciding, activity->entry_stagger());
-    flyers.push_back({std::make_unique<flyer_actor>(*definition, *placement.position, placement.angles), {}, false, placement.source, placement.group, side, script.groups.at(placement.group).trigger >= 0});
+    flyers.push_back({std::make_unique<flyer_actor>(*definition, *placement.position, placement.angles, rules), {}, false, placement.source, placement.group, side, script.groups.at(placement.group).trigger >= 0});
   }
   for(auto const &placement : placements.actors[static_cast<size_t>(actor_kind::base)]) {
     if(!placement.position) throw std::runtime_error{"base has an undefined negative-formation position"};
@@ -528,7 +529,7 @@ void mission_session::fire_selected(bool const pressed) {
     fired = true;
     for(auto const &shot : actor.discharge_aimed_slot(slot, settings.free_weapons())) launch(player_index, shot);
   });
-  if(weapon_definitions.edition == game_edition::expansion) {
+  if(revised_tactics()) {
     player_fire_line.clear();
     if(fired) {
       auto const &body{actor.body()};

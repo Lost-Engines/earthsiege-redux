@@ -1,4 +1,5 @@
 #include "tactical_controller.h"
+#include <algorithm>
 #include <stdexcept>
 
 namespace earthsiege {
@@ -23,10 +24,10 @@ std::optional<size_t> cycle_tactical_target(std::span<tactical_contact const> co
   return {};
 }
 
-tactical_controller::tactical_controller(bool const expanded) : expansion{expanded} {}
+tactical_controller::tactical_controller(mission_rules const mode) : rules{mode} {}
 void tactical_controller::initialize_height(int32_t height) {
   current.camera.z = height;
-  if(expansion) {
+  if(uses_revised_tactics(rules)) {
     maximum_height = height;
     zoom_step = std::max(5000, (height - 50000) / 25);
   }
@@ -59,8 +60,8 @@ void tactical_controller::choose(int32_t const command) {
   }
 }
 void tactical_controller::pan(int const x, int const y) {
-  auto const step{expansion
-    ? (((current.camera.z - 50000) >> 8) * 95000 / (maximum_height - 50000)) * 256 + 5000
+  auto const step{uses_revised_tactics(rules)
+    ? (((current.camera.z - 50000) >> 8) * 95000 / std::max(1, maximum_height - 50000)) * 256 + 5000
     : tactical_pan_step(current.camera.z)};
   if(current.camera.x + x * step >= -5000000 && current.camera.x + x * step <= 5000000) current.pan.x += x * step;
   if(current.camera.y + y * step >= -5000000 && current.camera.y + y * step <= 5000000) current.pan.y += y * step;
@@ -73,7 +74,7 @@ void tactical_controller::zoom(bool const out) {
   if(next >= 50000 && next <= maximum_height) current.camera.z = next;
 }
 std::pair<vec3<int32_t>, std::optional<size_t>> tactical_controller::pick(int const x, int const y, rectangle const &bounds, std::span<tactical_contact const> contacts) const {
-  unsigned const shift{expansion ? 8U : 7U};
+  unsigned const shift{uses_revised_tactics(rules) ? 8U : 7U};
   int const dx{x - bounds.left - ((bounds.right - bounds.left) >> 1)};
   int const dy{-(y - bounds.top - ((bounds.bottom - bounds.top) >> 1))};
   auto const &c{current.camera};
@@ -97,7 +98,7 @@ bool tactical_controller::destination(vec3<int32_t> const &point, std::optional<
         if(contact.actor == actor) {
           auto const &p{contact.position};
           auto const distance{fast_distance({p.x - player.x, p.y - player.y, p.z - player.z})};
-          if((expansion || distance < range) && contact.side == (current.command == 11 ? 1 : 0)) {
+          if((uses_revised_tactics(rules) || distance < range) && contact.side == (current.command == 11 ? 1 : 0)) {
             order.pending_actor = actor;
             order.pending_kind = 1;
             order.pending_active = true;
@@ -108,7 +109,7 @@ bool tactical_controller::destination(vec3<int32_t> const &point, std::optional<
         }
       }
     }
-    if(current.command == 11 || (!expansion && current.ready)) return false;
+    if(current.command == 11 || (!uses_revised_tactics(rules) && current.ready)) return false;
   } else if(current.command != 13 && current.command != 14) return false;
   order.pending = point;
   order.pending_kind = 0;
@@ -140,9 +141,11 @@ void tactical_controller::commit() {
   current.ready = false;
 }
 wingmate_order const &tactical_controller::packet(size_t const issuer) {
+  // DOS keeps the preceding destination in the unused half of its outgoing packet.
+  if(rules == mission_rules::redux) current.packet = {};
   current.packet.command = static_cast<uint16_t>(current.command);
   current.packet.issuer = issuer;
-  if(current.wingmate >= 0) {
+  if(current.wingmate >= 0 && (rules != mission_rules::redux || current.requires_destination)) {
     auto const &order{current.orders[static_cast<size_t>(current.wingmate)]};
     if(order.committed_kind == 1) {
       current.packet.target = order.committed_actor;

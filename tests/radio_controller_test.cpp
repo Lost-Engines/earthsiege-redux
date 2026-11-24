@@ -21,7 +21,7 @@ int main(int argc, char **argv) try {
   auto const trials{file.integer<uint32_t>()};
   size_t total{0};
   for(uint32_t trial{0}; trial < trials; ++trial) {
-    radio_controller radio;
+    radio_controller radio{earthsiege::mission_rules::retail_dos};
     auto const count{file.integer<uint32_t>()};
     for(uint32_t step{0}; step < count; ++step) {
       auto const ticks{static_cast<uint32_t>(read())};
@@ -97,7 +97,7 @@ int main(int argc, char **argv) try {
     auto id{cases.integer<int32_t>()};
     auto speaker{cases.integer<int32_t>()};
     auto result{cases.integer<int32_t>()};
-    radio_controller radio;
+    radio_controller radio{earthsiege::mission_rules::retail_dos};
     uint32_t text{0};
     for(auto [message, actor] : std::array<std::pair<uint8_t, size_t>, 3>{{{34, 1}, {30, 1}, {34, 2}}}) {
       radio.queue().push({message, 0, 0, 1, 3, 0, 10}, ++text, {message, actor, {}, {}}, 0);

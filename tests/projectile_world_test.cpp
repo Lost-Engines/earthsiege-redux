@@ -47,7 +47,7 @@ int main(int const argc, char **argv) try {
   for(size_t trace{0}; trace != traces; ++trace) {
     auto const ratio{file.integer<int16_t>()};
     earthsiege::random_state rng{random(file)};
-    earthsiege::world_projectiles world{resources, definitions};
+    earthsiege::world_projectiles world{resources, definitions, {}, earthsiege::mission_rules::retail_dos};
     auto const count{file.integer<uint16_t>()};
     for(size_t row{0}; row != count; ++row, ++frames) {
       auto const require{[&](bool const value, char const *field){

@@ -6,35 +6,24 @@
 
 namespace earthsiege {
 
-bool accumulate_damage(int16_t &amount, int16_t const capacity, int16_t &current, game_edition const edition) {
-  if(edition == game_edition::expansion) {
-    // Expansion 0xb2f8 compares the full sum, but forwards the OLD accumulator
-    // minus capacity. Negative internal damage then counts as destroyed. This
-    // surprising original rule changes both combat outcomes and tape playback.
-    if(current >= 0) {
-      if(static_cast<int>(current) + amount < capacity) {
-        current = wrap_word(current + amount);
-      } else {
-        amount = wrap_word(current - capacity);
-        current = -1;
-      }
-    }
-    return current < 0;
-  }
-  if(current >= 0) {
-    current = wrap_word(current + amount);
-    if(current >= capacity) {
-      amount = wrap_word(current - capacity);
-      current = -1;
-    }
+bool accumulate_damage(int16_t &amount, int16_t const capacity, int16_t &current, mission_rules const rules) {
+  if(current < 0) return true;
+  int total{current + amount};
+  if(rules == mission_rules::retail_dos) total = wrap_word(total);
+  if(total >= capacity) {
+    // Expansion DOS 0xb2f8 omits the incoming hit from the amount passed inward.
+    amount = wrap_word((rules == mission_rules::expansion_dos ? current : total) - capacity);
+    current = -1;
+  } else {
+    current = wrap_word(total);
   }
   return current < 0;
 }
 
-component_damage::component_damage(damage_definition const &source, damage_state initial, game_edition const game)
+component_damage::component_damage(damage_definition const &source, damage_state initial, mission_rules const mode)
   : definition{source},
     current{std::move(initial)},
-    edition{game} {
+    rules{mode} {
   if(current.internal.size() < definition.hit_points.size() || current.armour.size() != definition.components.size() || current.present.size() != definition.components.size()) throw std::invalid_argument{"damage state does not match its definition"};
 }
 
@@ -110,7 +99,7 @@ bool component_damage::distribute(size_t const section, int16_t amount, componen
       if(current.internal.at(slot) < 0) continue;
       choice = wrap_word(choice - entry.weight);
       if(choice >= 0) continue;
-      if(!accumulate_damage(amount, definition.hit_points.at(slot), current.internal[slot], edition)) return false;
+      if(!accumulate_damage(amount, definition.hit_points.at(slot), current.internal[slot], rules)) return false;
       selected = true;
       break;
     }
@@ -162,7 +151,7 @@ void component_damage::knock_off_weapon(size_t const section, component_choice c
 std::vector<size_t> component_damage::apply_section(size_t const section, int16_t amount, component_choice const &choose, section_detachment const &detach) {
   std::vector<size_t> removed;
   auto const &piece{definition.components.at(section)};
-  if(accumulate_damage(amount, piece.armour, current.armour[section], edition)) {
+  if(accumulate_damage(amount, piece.armour, current.armour[section], rules)) {
     if(!distribute(section, amount, choose)) {
       if(piece.cell_sequence >= 0) current.cells.at(static_cast<size_t>(piece.cell_sequence)) = 1;
     } else if(piece.flags & std::to_underlying(damage_section_flag::detachable)) {

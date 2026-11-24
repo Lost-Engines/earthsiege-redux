@@ -30,7 +30,7 @@ int main(int argc, char **argv) try {
   auto const script{read_mission_script(file.take(file.integer<uint32_t>()))};
   auto const roster{read_player_roster(file.take(file.integer<uint32_t>()))};
   auto const counters{read_mission_counters(file.take(file.integer<uint32_t>()))};
-  mission_session session{resources, script, roster, random_state{0}, counters};
+  mission_session session{resources, script, roster, random_state{0}, counters, {}, earthsiege::dos_mission_rules(resources.edition())};
   auto const names{read_resource_names(resources.read("simvol0", "nam/MECHS.NAM"))};
   auto const art{read_cockpit(resources, names.at(static_cast<size_t>(session.player_chassis())))};
   pointer_controls input;

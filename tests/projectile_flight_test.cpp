@@ -81,7 +81,7 @@ int main(int const argc, char **argv) try {
       bool const owner_guiding{file.integer<uint8_t>() != 0};
       bool const held{file.integer<uint8_t>() != 0};
       vec2<int16_t> const axes{file.integer<int16_t>(), file.integer<int16_t>()};
-      auto const result{earthsiege::advance_projectile(state, motions, speed_limit, cell_counts, ratio, input)};
+      auto const result{earthsiege::advance_projectile(state, motions, speed_limit, cell_counts, ratio, input, {}, earthsiege::mission_rules::retail_dos)};
       if(state.position != expected.position || state.angles != expected.angles || state.speed != expected.speed || state.age != expected.age || state.animation_remaining != expected.animation_remaining || state.cells != expected.cells || state.subtype != expected_type || state.target_present != target || input.owner_guiding != owner_guiding || input.manual_held != held || input.manual_axes != axes || (result != earthsiege::projectile_result::flying) != done) {
         file.fail("projectile trace " + std::to_string(trace) + " mode " + mode + " step " + std::to_string(step) + " differs");
       }

@@ -121,8 +121,8 @@ int main(int argc, char **argv) try {
     flight.position = {0, 0, 10000};
     projectile_guidance guidance;
     for(unsigned j{0}; j < steps; ++j) {
-      auto result{advance_projectile(flight, motions, 1000, {}, ratio, guidance)};
-      eq(f, flight.age, "original bullet age");
+      auto result{advance_projectile(flight, motions, 1000, {}, ratio, guidance, {}, earthsiege::dos_mission_rules(motions.edition))};
+      eq(f, static_cast<int16_t>(flight.age), "original bullet age");
       eq(f, static_cast<uint8_t>(result == projectile_result::expired), "original bullet expiry");
     }
   }

@@ -15,10 +15,10 @@ damage_state initial_damage(shape_part const &shape) {
   return {{0}, {0}, {0x0101}, std::vector<int16_t>(shape.cell_frame_counts.size()), {}};
 }
 }
-flyer_actor::flyer_actor(flyer_definition const &source, vec3<int32_t> const &position, vec3<uint16_t> const &angles)
+flyer_actor::flyer_actor(flyer_definition const &source, vec3<int32_t> const &position, vec3<uint16_t> const &angles, mission_rules const rules)
   : definition{source},
     visual{std::get<shape_part>(source.models.roots.at(0).content)},
-    components{source.damage, initial_damage(std::get<shape_part>(source.models.roots.at(0).content)), source.profile.edition},
+    components{source.damage, initial_damage(std::get<shape_part>(source.models.roots.at(0).content)), rules},
     flight{vec3<int32_t>{position}, vec3<uint16_t>{angles}, {0, source.profile.forward_step, 0}, {}} {}
 flyer_profile const &flyer_actor::profile() const {
   return definition.profile;

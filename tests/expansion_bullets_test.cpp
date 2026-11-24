@@ -91,11 +91,11 @@ int main(int argc, char **argv) try {
         }
         packets.push_back(p);
         return hit ? std::optional<int32_t>{101} : std::nullopt;
-      })};
+      }, earthsiege::mission_rules::expansion_dos)};
       equal(r, static_cast<uint8_t>(result != projectile_result::flying), "termination");
       check(projectile.flight().position == point<int32_t>(r), "position");
       check(projectile.flight().angles == point<uint16_t>(r), "angles");
-      equal(r, projectile.flight().age, "age");
+      equal(r, static_cast<int16_t>(projectile.flight().age), "age");
       equal(r, projectile.flight().strength, "strength");
       equal(r, projectile.flight().animation_remaining, "animation timer");
       equal(r, static_cast<uint16_t>(projectile.flight().cells.size()), "cell count");

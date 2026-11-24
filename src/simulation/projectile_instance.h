@@ -56,7 +56,7 @@ public:
   model_part const &geometry() const;
   void clear_target();
   model_transform placement() const;
-  projectile_result advance(frame_ratio ratio, projectile_guidance &guidance, impact_query const &hit);
+  projectile_result advance(frame_ratio ratio, projectile_guidance &guidance, impact_query const &hit, mission_rules rules = mission_rules::redux);
 };
 
 } // namespace earthsiege

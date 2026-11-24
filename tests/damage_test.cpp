@@ -54,7 +54,7 @@ int main(int const argc, char **argv) try {
     auto const expected_current{file.integer<int16_t>()};
     auto const expected_amount{file.integer<int16_t>()};
     bool const expected_dead{file.integer<uint8_t>() != 0};
-    bool const dead{earthsiege::accumulate_damage(amount, capacity, current)};
+    bool const dead{earthsiege::accumulate_damage(amount, capacity, current, earthsiege::mission_rules::retail_dos)};
     if(dead != expected_dead || amount != expected_amount || current != expected_current) file.fail("damage accumulator " + std::to_string(row) + " differs");
   }
   auto const chassis{file.integer<uint16_t>()};

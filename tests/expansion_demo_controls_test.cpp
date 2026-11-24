@@ -74,7 +74,7 @@ int main(int argc, char **argv) try {
     auto const expected_amount{word()};
     auto const expected_current{word()};
     auto const expected_dead{word()};
-    auto const dead{earthsiege::accumulate_damage(amount, capacity, current, earthsiege::game_edition::expansion)};
+    auto const dead{earthsiege::accumulate_damage(amount, capacity, current, earthsiege::mission_rules::expansion_dos)};
     if(amount != expected_amount || current != expected_current || dead != (expected_dead != 0)) file.fail("expansion damage accumulator " + std::to_string(row));
   }
   auto const capacitors{file.integer<uint32_t>()};
@@ -96,7 +96,7 @@ int main(int argc, char **argv) try {
     auto const maximum{file.integer<int32_t>()};
     auto const height{file.integer<int32_t>()};
     auto const expected{file.integer<int32_t>()};
-    earthsiege::tactical_controller controller{true};
+    earthsiege::tactical_controller controller{earthsiege::mission_rules::expansion_dos};
     controller.initialize_height(maximum);
     controller.camera({0, 0, height});
     controller.pan(1, 0);

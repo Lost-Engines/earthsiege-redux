@@ -12,8 +12,9 @@ live_projectile::live_projectile(projectile_owner source, weapon_shot const &sho
   : owner{source},
     state{std::in_place_type<projectile_instance>, shot, definitions, motions, bullets, rockets, source.target.has_value(), initial_rocket_clock, &random} {}
 
-world_projectiles::world_projectiles(resource_store const &resources, weapon_catalogue const &catalogue, sound_sink sink)
-  : sounds{std::move(sink)},
+world_projectiles::world_projectiles(resource_store const &resources, weapon_catalogue const &catalogue, sound_sink sink, mission_rules const mode)
+  : rules{mode},
+    sounds{std::move(sink)},
     definitions{catalogue},
     motions{read_bullet_motions(resources.read("simvol0", "dat/BULLETS.DAT"), resources.edition()), read_rocket_motions(resources.read("simvol0", "dat/ROCKETS.DAT")), resources.edition()},
     bullet_models{read_model(resources.read("simvol0", "dts/BULLETS.DTS"))},
@@ -55,7 +56,7 @@ void world_projectiles::advance(frame_ratio const ratio, projectile_guidance_que
       auto &flight{std::get<projectile_instance>(projectile.state)};
       auto input{guidance ? guidance(projectile.owner) : projectile_guidance{}};
       if(!projectile.owner.target) flight.clear_target();
-      done = flight.advance(ratio, input, [&](impact_request const &request){return hit ? hit(projectile.owner, request) : std::nullopt;}) != projectile_result::flying;
+      done = flight.advance(ratio, input, [&](impact_request const &request){return hit ? hit(projectile.owner, request) : std::nullopt;}, rules) != projectile_result::flying;
       if(feedback) feedback(projectile.owner, input);
     }
     if(done) projectiles.defer_erase(slot);

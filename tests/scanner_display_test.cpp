@@ -16,7 +16,7 @@ int main(int argc, char **argv) try {
   using earthsiege::scanner_display_state;
   if(argc != 3) return EXIT_FAILURE;
   resource_store resources{argv[1]};
-  scanner_display display{resources};
+  scanner_display display{resources, earthsiege::mission_rules::retail_dos};
   auto const source{read_file(argv[2])};
   binary_reader file{source};
   auto const magic{file.take(8)};

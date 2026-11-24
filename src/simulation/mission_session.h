@@ -26,6 +26,7 @@
 #include "simulation/hit_dispatch.h"
 #include "simulation/mission_activity.h"
 #include "simulation/mission_objectives.h"
+#include "simulation/mission_rules.h"
 #include "simulation/player_armament.h"
 #include "simulation/player_input.h"
 #include "simulation/radio_queue.h"
@@ -143,6 +144,7 @@ class mission_session {
     bool waiting{false};
   };
   mission_header settings;
+  mission_rules ruleset;
   bool falloff_preference{false};
   bool recorded_playback{false};
   bool world_frozen{false};
@@ -246,7 +248,9 @@ class mission_session {
   std::vector<scene_model> herc_models(bool roster_only, bool include_player = true);
 
 public:
-  mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random = {}, mission_counters initial_counters = {}, fragment_settings fragments = {});
+  mission_session(resource_store const &resources, mission_script const &script, player_roster const &roster, random_state initial_random = {}, mission_counters initial_counters = {}, fragment_settings fragments = {}, mission_rules rules = mission_rules::redux);
+  mission_rules rules() const { return ruleset; }
+  bool revised_tactics() const { return uses_revised_tactics(ruleset); }
   mission_session(mission_session const&) = delete;
   mission_session(mission_session&&) = delete;
   mission_session &operator=(mission_session const&) = delete;

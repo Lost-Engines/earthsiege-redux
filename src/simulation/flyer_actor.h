@@ -25,7 +25,7 @@ class flyer_actor {
   bool detectable{false};
 
 public:
-  flyer_actor(flyer_definition const &definition, vec3<int32_t> const &position, vec3<uint16_t> const &angles);
+  flyer_actor(flyer_definition const &definition, vec3<int32_t> const &position, vec3<uint16_t> const &angles, mission_rules rules = mission_rules::redux);
   flyer_actor(flyer_actor const &) = delete;
   flyer_actor(flyer_actor &&) = delete;
   flyer_actor &operator=(flyer_actor const &) = delete;

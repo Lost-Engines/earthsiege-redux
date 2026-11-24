@@ -7,6 +7,7 @@
 #include "simulation/animation_rig.h"
 #include "simulation/footsteps.h"
 #include "simulation/locomotion.h"
+#include "simulation/mission_rules.h"
 #include "simulation/sound_request.h"
 #include "simulation/weapon_assembly.h"
 
@@ -31,7 +32,7 @@ class herc_body {
   locomotion_state movement_state;
   movement_damage damage;
   bool throttle_command_pending{false};
-  bool expansion{false};
+  bool revised_controls;
   int16_t direction_mode{0};
   std::vector<movement_event> frame_movement_events;
   aiming_state torso_state;
@@ -44,7 +45,7 @@ class herc_body {
   std::optional<size_t> elevation_channel;
 
 public:
-  herc_body(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, sound_sink sounds = {});
+  herc_body(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, sound_sink sounds = {}, mission_rules rules = mission_rules::redux);
   void place(vec3<int32_t> const &position, vec3<uint16_t> const &angles);
   void mark_collapsed();
   void apply_damage(damage_consequences const &consequences);

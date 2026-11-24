@@ -6,9 +6,11 @@ combat and objectives, return/debrief, salvage, repair, construction, progressio
 cinematics, music, effects and speech. It loads the bundled original resources
 directly; DOSBox and x86 emulation are only research tools.
 
-The DOS comparison fixtures supply their original random seeds. Interactive Redux
-sessions use the C++ standard generator. The shipped input tapes still use the
-recorded game's sequence, including when the player changes fragment density.
+DOS comparisons use the recorded executable's mission rules and random sequence.
+Live Redux tests cover both campaigns' tactical orders, scanner orientation,
+bullet lifetime, armour penetration, radio queues and shield recharge. The
+mission-rule tests also check that starting an interactive inspection and playing
+the same tape select the appropriate rules.
 
 This is the current baseline for comparison playtesting. The chronological
 [implementation record](IMPLEMENTATION.md) preserves earlier milestones;

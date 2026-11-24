@@ -1,5 +1,6 @@
 #pragma once
 #include "render/tactical_map.h"
+#include "simulation/mission_rules.h"
 #include "simulation/wingmate_orders.h"
 
 namespace earthsiege {
@@ -31,11 +32,11 @@ std::optional<size_t> cycle_tactical_target(std::span<tactical_contact const> co
 /// Original lower-map selection and order packet lifetime, independent of drawing.
 class tactical_controller {
   tactical_control_state current;
-  bool expansion{false};
+  mission_rules rules;
   int32_t maximum_height{1000000};
   int32_t zoom_step{50000};
 public:
-  explicit tactical_controller(bool expansion = false);
+  explicit tactical_controller(mission_rules rules = mission_rules::redux);
   void initialize_height(int32_t height);
   tactical_control_state const &state() const;
   void camera(vec3<int32_t> const &position);

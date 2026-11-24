@@ -84,7 +84,7 @@ int main(int argc, char **argv) try {
         }
       }
     }
-    mission_session session{resources, script, roster, random_state{initial}, counters};
+    mission_session session{resources, script, roster, random_state{initial}, counters, {}, earthsiege::dos_mission_rules(resources.edition())};
     auto const steps{file.integer<uint16_t>()};
     auto const nh{file.integer<uint16_t>()};
     auto const nf{file.integer<uint16_t>()};

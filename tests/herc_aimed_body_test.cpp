@@ -35,7 +35,7 @@ int main(int argc, char **argv) try {
     auto const values{words()};
     auto const initial{herc_reference::read_state(file)};
     auto const definition{read_herc_definition(resources, name)};
-    herc_actor actor{definition, definitions, templates, equipment, initial.position, initial.angles, values};
+    herc_actor actor{definition, definitions, templates, equipment, initial.position, initial.angles, values, {}, earthsiege::dos_mission_rules(resources.edition())};
     herc_reference::check(actor.body(), initial, name + "/initial");
     auto const count{file.integer<uint16_t>()};
     for(unsigned int frame{0}; frame != count; ++frame) {

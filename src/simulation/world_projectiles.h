@@ -28,6 +28,7 @@ using projectile_guidance_feedback = std::function<void(projectile_owner const &
 
 /// Own every projectile kind in one bounded, ordered pool with deferred reclamation.
 class world_projectiles {
+  mission_rules rules;
   sound_sink sounds;
   weapon_catalogue const &definitions;
   projectile_motions motions;
@@ -41,7 +42,7 @@ class world_projectiles {
   std::array<int16_t, projectile_capacity> retained_rocket_clocks{};
 
 public:
-  world_projectiles(resource_store const &resources, weapon_catalogue const &definitions, sound_sink sounds = {});
+  world_projectiles(resource_store const &resources, weapon_catalogue const &definitions, sound_sink sounds = {}, mission_rules rules = mission_rules::redux);
   std::optional<size_t> launch(projectile_owner owner, weapon_shot const &shot, random_state &random, world_impact_query const &hit);
   void advance(frame_ratio ratio, projectile_guidance_query const &guidance, world_impact_query const &hit, projectile_guidance_feedback const &feedback = {});
   void collect();

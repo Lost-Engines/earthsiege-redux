@@ -89,7 +89,7 @@ void mission_session::move_herc(size_t const index, movement_request const &requ
     avoid_obstacles(adjusted, {vec3<int32_t>{motion.position}, motion.angles.z, motion.gait_rate, motion.collision_recovery, member.collision_bias, motion.reverse_recovery}, bodies,
       [&](avoidance_probe kind, auto const &start, auto const &end){return obstacle_distance(kind, start, end);},
       {
-        .expansion{weapon_definitions.edition == game_edition::expansion},
+        .expansion{revised_tactics()},
        .friendly_fire_line{activity->actor(activity->group(member.group).members.front()).player ? std::span<vec2<int32_t> const>{player_fire_line} : std::span<vec2<int32_t> const>{}},
        .reverse_rate{member.definition->profile.movement.reverse_rate}
       });
@@ -230,7 +230,7 @@ vec3<int32_t> mission_session::guard_anchor(size_t const index) const {
   switch(activity->decisions()[index].command) {
   case 6:
     // Expansion DEFEND can follow a selected friendly actor instead of a point.
-    if(weapon_definitions.edition == game_edition::expansion && member.followed) return combat_position(*member.followed).position;
+    if(member.followed && revised_tactics()) return combat_position(*member.followed).position;
     return vec3<int32_t>{member.command_position};
   case 3:
     return combat_position(member.followed.value()).position;
@@ -251,7 +251,7 @@ bool mission_session::herc_target_completed(size_t const index) const {
   auto const observations{observe()};
   if(own.command == 4 && crew[index].designated) {
     auto const type{activity->decisions()[target].controller.type};
-    auto const properties{type ? describe(*type, weapon_definitions.edition == game_edition::expansion).properties : uint16_t{0}};
+    auto const properties{type ? describe(*type, revised_tactics()).properties : uint16_t{0}};
     return (properties & 32 ? 2 : properties & 16 ? 1 : 0) > crew[index].stop_status;
   }
   auto const &objectives{activity->group(crew[index].group).objectives};
@@ -307,7 +307,7 @@ void mission_session::hit_reaction(size_t const victim, size_t const attacker, i
   react_to_herc_hit(member.reactions, activity->decisions()[victim], activity->targets(), victim, attacker, damage,
     {victim == player_index, member.group == crew[player_index].group, attacker == player_index, member.side == activity->group(actor_group(attacker)).side,
      activity->actor(leader).player, activity->targets()[leader].selected == attacker, combat_kind(activity->actor(attacker).kind),
-     weapon_definitions.edition == game_edition::expansion, source.dead || source.disabled || source.unavailable},
+     revised_tactics(), source.dead || source.disabled || source.unavailable},
     member.ignore_hud_target, member.designated, {
     .share_contact{[&]{activity->share_contact(victim, attacker, observe());}},
     .friendly_warning{[&]{
@@ -340,7 +340,7 @@ void mission_session::reconsider_herc(size_t const index) {
     activity->decisions()[i].disabled = observations[i].disabled;
   }
   reconsider_herc_attack(activity->decisions(), activity->targets(), index, group.members,
-    {group.order, activity->actor(group.members.front()).player, member.radar_active, actor.impacts().ecm_remaining, weapon_definitions.edition == game_edition::expansion}, actor.impacts().detectable, {
+    {group.order, activity->actor(group.members.front()).player, member.radar_active, actor.impacts().ecm_remaining, revised_tactics()}, actor.impacts().detectable, {
     .select{[&](target_selection_flags flags){return activity->select(observe(), index, flags, std::nullopt, random);}},
     .target_kind{[&](size_t target){return combat_kind(activity->actor(target).kind);}},
     // 0x174ca invokes each eligible follower's own strategy synchronously.
@@ -475,7 +475,7 @@ void mission_session::dispatch_herc(size_t const index, frame_ratio const ratio)
     if(enter_skirting(index)) return false;
     auto const target{activity->targets()[index].selected.value()};
     return attack_with_herc(type, member.attack, state.command,
-      {combat_position(index), combat_position(target), actor.impacts().damage_received, incapacitated(state), incapacitated(activity->decisions()[target]), herc_target_completed(index), target >= base_id(0) && bases[target - base_id(0)].actor->profile().can_retaliate, weapon_definitions.edition == game_edition::expansion}, ratio, {
+      {combat_position(index), combat_position(target), actor.impacts().damage_received, incapacitated(state), incapacitated(activity->decisions()[target]), herc_target_completed(index), target >= base_id(0) && bases[target - base_id(0)].actor->profile().can_retaliate, revised_tactics()}, ratio, {
       .move{[&](movement_request const &request){move_herc(index, request, ratio);}},
       .aim{[&](int16_t facing){aim_herc(index, target, facing, ratio);}},
       .completed{[&, target, type]{
@@ -545,7 +545,7 @@ void mission_session::dispatch_herc(size_t const index, frame_ratio const ratio)
               reconsider_herc(index);
             }},
             .enter{orders.enter},
-          }, weapon_definitions.edition == game_edition::expansion && member.weapons_free);
+          }, revised_tactics() && member.weapons_free);
         return false;
       case behavior::travelling:
       case behavior::bulldog_travel:
@@ -575,13 +575,13 @@ void mission_session::dispatch_herc(size_t const index, frame_ratio const ratio)
         std::vector<size_t> candidates(crew.size());
         std::iota(candidates.begin(), candidates.end(), 0);
         guard_with_herc(activity->decisions(), activity->targets(), index, candidates,
-            {guard_anchor(index), activity->actor(group.members.front()).player, member.radar_active, activity->actor(index).persistent_signature, group.representative.has_value(), member.designated, weapon_definitions.edition == game_edition::expansion, member.weapons_free}, actor.impacts().detectable, ratio, {
+            {guard_anchor(index), activity->actor(group.members.front()).player, member.radar_active, activity->actor(index).persistent_signature, group.representative.has_value(), member.designated, revised_tactics(), member.weapons_free}, actor.impacts().detectable, ratio, {
             .position{orders.position},
               .eligible{[&](size_t target){
                 return activity->eligible(observe(), index, target);
               }},
             .navigate{[&]{
-              navigate_herc(index, ratio, weapon_definitions.edition != game_edition::expansion);
+              navigate_herc(index, ratio, !revised_tactics());
             }},
               .centre_aim{orders.centre_aim},
             .move_to{[&](vec3<int32_t> const &point){

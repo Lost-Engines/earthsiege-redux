@@ -10,12 +10,12 @@
 
 namespace earthsiege {
 
-herc_actor::herc_actor(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> const equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<int16_t const> const weapon_values, sound_sink sounds)
+herc_actor::herc_actor(herc_definition const &definition, weapon_catalogue const &weapons, model_resource const &templates, std::span<int16_t const> const equipment, vec3<int32_t> const &position, vec3<uint16_t> const &angles, std::span<int16_t const> const weapon_values, sound_sink sounds, mission_rules const rules)
   : source{definition},
     weapon_definitions{weapons},
     loadout{assemble_herc_loadout(definition, equipment, weapons)},
-    body_state{definition, weapons, templates, equipment, position, angles, std::move(sounds)},
-    components{loadout.damage, initial_herc_damage(loadout, body_state.model().cell_frames().size()), weapons.edition},
+    body_state{definition, weapons, templates, equipment, position, angles, std::move(sounds), rules},
+    components{loadout.damage, initial_herc_damage(loadout, body_state.model().cell_frames().size()), rules},
     power_state{
       .reserve{herc_power_capacity},
       .shields{static_cast<int16_t>(definition.profile.shield_capacity >> 1), static_cast<int16_t>(definition.profile.shield_capacity >> 1), shield_balance_one / 2, definition.profile.shield_capacity}
@@ -333,7 +333,7 @@ void herc_actor::update_power(frame_ratio const ratio, bool const free_energy, i
 }
 
 void herc_actor::apply_aim(herc_aim_request const &request, frame_ratio const ratio, std::optional<vec2<int16_t>> const target) {
-  body_state.prepare_aim(request.controls, ratio, weapon_definitions.edition == game_edition::expansion ? target : std::nullopt);
+  body_state.prepare_aim(request.controls, ratio, target);
   for(size_t i{0}; i != armament.slots().size(); ++i) {
     if(armament.slots()[i]) {
       auto &weapon{armament.at(i)};

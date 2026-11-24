@@ -2,6 +2,7 @@
 #include "vectorstorm/vector/vector2.h"
 #include "resources/cockpit.h"
 #include "resources/model.h"
+#include "simulation/mission_rules.h"
 #include "simulation/target_selection.h"
 
 namespace earthsiege {
@@ -18,20 +19,20 @@ struct scanner_contact {
 };
 struct scanner_display_state {
   vec2<int32_t> player_position;
-  uint16_t heading;
+  uint16_t heading;                                                            // live: world to torso; retail tape: camera heading
   uint32_t ticks;
   int32_t range;
   bool radar_active;
   std::vector<scanner_contact> contacts;                                       // original world order, excluding the player
 };
 class scanner_display {
-  bool expansion;
+  mission_rules rules;
   bitmap background;
   std::array<font, 3> fonts;                                                   // blue, green, red
   std::array<std::string, 2> activity_labels;
   std::array<std::string, 2> distance_labels;
 public:
-  explicit scanner_display(resource_store const &resources);
+  explicit scanner_display(resource_store const &resources, mission_rules rules = mission_rules::redux);
   void draw(framebuffer &target, rectangle const &bounds, scanner_display_state const &state, model_transform const &world_to_camera = {}) const;
 };
 

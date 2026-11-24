@@ -51,8 +51,10 @@ damage_display_state mission_session::instrument_damage(std::optional<size_t> co
 }
 
 scanner_display_state mission_session::scanner_state(uint16_t const heading, uint32_t const ticks, int32_t const range) const {
-  auto const &position{player().movement().position};
-  scanner_display_state result{{position.x, position.y}, heading, ticks, range, player_actor().impacts().detectable, {}};
+  auto const &body{player()};
+  auto const &position{body.movement().position};
+  auto const rotation{ruleset == mission_rules::redux ? static_cast<uint16_t>(body.torso().angle - body.movement().angles.z) : heading};
+  scanner_display_state result{{position.x, position.y}, rotation, ticks, range, player_actor().impacts().detectable, {}};
   auto const observations{observe()};
   for(size_t i{0}; i < observations.size(); ++i) {
     if(i == player_index) continue;
@@ -102,7 +104,7 @@ full_damage_state mission_session::full_damage(std::optional<size_t> const selec
 tactical_map_state mission_session::tactical_state(uint32_t const ticks) const {
   tactical_map_state result;
   result.ticks = ticks;
-  result.projection_shift = weapon_definitions.edition == game_edition::expansion ? 8 : 7;
+  result.projection_shift = revised_tactics() ? 8 : 7;
   // The original globals begin at zero, so the mission rectangle also encloses
   // the world origin when every authored point lies on the same side of it.
   for(auto const &p : points) {

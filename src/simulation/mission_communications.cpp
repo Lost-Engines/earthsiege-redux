@@ -7,7 +7,7 @@ std::optional<int16_t> mission_session::pilot_identity(size_t const actor) const
 }
 wingmate_order_state mission_session::order_state(size_t const index) const {
   wingmate_order_state s;
-  s.expansion = weapon_definitions.edition == game_edition::expansion;
+  s.expansion = revised_tactics();
   auto const &decision{activity->decisions()[index]};
   s.position = combat_position(index).position;
   s.type = decision.controller.type.value_or(behavior::herc_deciding);
