@@ -50,6 +50,10 @@ In DOS, a distant building could lose its silhouette in the haze while its paint
 ./build/earthsiege --demo 2 --lod-distance-multiplier 1 --distance-cutoff-multiplier 1
 ```
 
+### Cockpit shields
+
+Both editions use the expansion's shield gauge. An empty front or rear shield goes black. As it recharges, one green band appears first. The other two start to light above 25% and 37.5% charge. The numbers beside the gauge show the requested front and rear allocation.
+
 ### Impact fragments
 
 `--fragment-count-multiplier N` scales the maximum number of loose pieces thrown by each impact burst. At the Redux default of `4`, hits can throw from zero to 8, 16 or 24 pieces, depending on the damage. Fractions round the maximum down. At `0`, hits can still knock a weapon off its mount.

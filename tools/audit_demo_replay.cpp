@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include "render/shield_instruments.h"
 #include "resources/resource_store.h"
 #include "shell/mission_alert.h"
 #include "shell/mission_options_dialog.h"
@@ -43,6 +44,23 @@ struct replay_sound_request {
   uint16_t id;
   bool operator==(replay_sound_request const &) const = default;
 };
+
+// The base-game fixtures sample one pixel from each band of the forward shield ring.
+// Use the original pixel positions and the expansion colours verified in shield_instruments_test.
+void check_shield_sample(mission_view const &view, earthsiege::shield_power const &charge,
+                         uint32_t frame, uint16_t x, uint16_t y) {
+  constexpr std::array<uint16_t, 6> ring_y{184, 182, 180, 193, 195, 197};
+  auto const band{std::ranges::find(ring_y, y)};
+  if(x != 209 || band == ring_y.end()) throw std::runtime_error{"Unknown shield sample position"};
+  auto const slot{80 + (band - ring_y.begin())};
+  earthsiege::palette expected;
+  earthsiege::update_shield_colours(expected, charge.front * 1024 / charge.capacity, charge.rear * 1024 / charge.capacity);
+  auto const index{view.image().pixels()[y * screen_width + x]};
+  if(index != slot || view.colours().colours[index] != expected.colours[slot]) {
+    throw std::runtime_error{"Redux shield band differs at frame " + std::to_string(frame) + " pixel " + std::to_string(x) + "," + std::to_string(y)};
+  }
+}
+
 std::array<int32_t, 24> camera_values(camera_state const &camera) {
   return {camera.position.x, camera.position.y, camera.position.z,
                 int32_t{camera.angles.x}, int32_t{camera.angles.y}, int32_t{camera.angles.z},
@@ -300,6 +318,9 @@ int main(int argc, char **argv) try {
       for(auto &value : expected_camera) value = file.integer<int32_t>();
     }
     audio_clock(clock);
+    // The cockpit paints the charge from the preceding update. The actor audit
+    // checks those front and rear values against the DOS trace on every update.
+    auto const shield_before_step{view.simulation().player_actor().power().shields};
     if(packet != -1 && packet != -3) {
       tape_frame record;
       if(packet >= 0) {
@@ -318,6 +339,10 @@ int main(int argc, char **argv) try {
     if(phase == 1) {
       while(next_raster_frame < raster_frames.size() && raster_frames[next_raster_frame].frame == frame - 1) {
         auto const &expected{raster_frames[next_raster_frame++]};
+        if(expected.kind == "instrument" && expected.width == 1 && expected.height == 1) {
+          check_shield_sample(view, shield_before_step, frame - 1, expected.x, expected.y);
+          continue;
+        }
         size_t byte{0};
         for(unsigned y{0}; y < expected.height; ++y) {
           for(unsigned x{0}; x < expected.width; ++x) {

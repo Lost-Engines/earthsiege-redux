@@ -1513,12 +1513,13 @@ Both sheets have 64 sprites. The lower map controls also carry a hit shape
 independent of their image dimensions.
 
 Both editions display the requested shield allocation as two numbers that add
-up to 200. The three coloured bands on each side show its stored charge. Retail
-subtracts a brightness offset from the base green. The expansion scales the
-green itself. Its first two bands stay black up to 37.5% and 25% charge
-respectively, while the third brightens across the full range. The shield test
-compares all 1,025 charge levels with the DOS palette routines. Expansion demo
-4 also checks the gauge before and after the rear allocation returns to 20.
+up to 200. The three coloured bands on each side show its stored charge. The
+1994 DOS game subtracts a brightness offset from the base green. Redux uses
+the expansion's brightness curves in both editions. Its first two bands stay
+black up to 37.5% and 25% charge respectively, while the third brightens
+across the full range. The shield test compares all 1,025 charge levels with
+the expansion DOS routine. Base demo 1 checks all six bands throughout the
+lift. Expansion demo 4 checks the gauge as the rear allocation returns to 20.
 
 Expansion pilot names use the roster slot directly. The three slots sharing
 each portrait still use the same face and speech resources. An occupied crew
@@ -1856,11 +1857,11 @@ twice instead of resetting the reverse bar. Its resulting retained pixels and
 next-update behaviour are reproduced, rather than recomputing a fresh bar.
 
 The independent ESTHUP01 sequence fixture covers 2,720 original incremental
-and full repaint cases across all eight cockpit layouts. Four replay fixtures
-add 579 original reactor/throttle regions and shield-colour samples, excluding
-13 regions near the original software cursor. Six shield points deliberately
-avoid the separately clocked red lamps. These expected pixels never feed native
-simulation or rendering.
+and full repaint cases across all eight cockpit layouts. The four base-game
+replays check 147 reactor and throttle regions against DOS and sample the
+shield ring at 432 points. Each shield sample checks the original palette
+index at that pixel and the displayed expansion colour for the charge on the
+preceding update. The six sampling positions avoid the blinking red lamps.
 
 
 ## World-selected ground-effect models

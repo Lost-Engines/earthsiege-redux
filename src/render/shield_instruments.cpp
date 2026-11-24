@@ -3,53 +3,26 @@
 #include <string>
 
 namespace earthsiege {
-namespace {
-using shield_ramp = std::array<std::array<uint8_t, 3>, 3>;
-constexpr std::array<int, 3> shield_green{25, 59, 23};
 
-shield_ramp retail_ramp(int32_t charge) {
-  // Retail 0x39340 subtracts a separate amount from each band's RGB components.
-  int const percent{charge * 100 >> 9};
-  std::array<int, 3> const dimming{
-    percent > 125 ? 0 : percent < 25 ? 50 : 125 - percent,
-    percent > 150 ? 0 : percent < 50 ? 50 : (150 - percent) >> 1,
-    (200 - percent) >> 2,
-  };
-  shield_ramp ramp;
-  for(size_t band{0}; band < ramp.size(); ++band) {
-    for(size_t channel{0}; channel < shield_green.size(); ++channel) {
-      ramp[band][channel] = static_cast<uint8_t>(std::max(0, shield_green[channel] - dimming[band]));
-    }
-  }
-  return ramp;
-}
-
-shield_ramp expansion_ramp(int32_t charge) {
-  // Expansion 0x3d0f4 scales the same green with three Q10 brightness curves.
-  std::array<int32_t, 3> const brightness{
-    4 * (std::clamp(charge, 384, 640) - 384),
-    2 * (std::clamp(charge, 256, 768) - 256),
-    charge,
-  };
-  shield_ramp ramp;
-  for(size_t band{0}; band < ramp.size(); ++band) {
-    for(size_t channel{0}; channel < shield_green.size(); ++channel) {
-      int const scaled{(shield_green[channel] * brightness[band] + 512) >> 10};
-      ramp[band][channel] = static_cast<uint8_t>(std::max(0, scaled));
-    }
-  }
-  return ramp;
-}
-}
-
-void update_shield_colours(palette &colours, int32_t const front, int32_t const rear, game_edition edition) {
+void update_shield_colours(palette &colours, int32_t const front, int32_t const rear) {
+  // Expansion 0x3d0f4 scales the base green with three Q10 brightness curves.
+  constexpr std::array<int, 3> green{25, 59, 23};
   std::array<int32_t, 2> const charge{front, rear};
   for(size_t side{0}; side < charge.size(); ++side) {
-    auto const ramp{edition == game_edition::expansion ? expansion_ramp(charge[side]) : retail_ramp(charge[side])};
-    for(size_t band{0}; band < ramp.size(); ++band) {
-      size_t const index{80 + side * ramp.size() + band};
-      colours.dac_colours[index] = ramp[band];
-      colours.colours[index] = display_colour(ramp[band]);
+    auto const value{charge[side]};
+    std::array<int32_t, 3> const brightness{
+      4 * (std::clamp(value, 384, 640) - 384),
+      2 * (std::clamp(value, 256, 768) - 256),
+      value,
+    };
+    for(size_t band{0}; band < brightness.size(); ++band) {
+      size_t const index{80 + side * brightness.size() + band};
+      auto &dac{colours.dac_colours[index]};
+      for(size_t channel{0}; channel < green.size(); ++channel) {
+        int const scaled{(green[channel] * brightness[band] + 512) >> 10};
+        dac[channel] = static_cast<uint8_t>(std::max(0, scaled));
+      }
+      colours.colours[index] = display_colour(dac);
     }
   }
 }

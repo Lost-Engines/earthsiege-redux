@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -73,6 +74,13 @@ int main(int argc, char **argv) try {
     start.presented(present_clock);
     live.draw_startup(draw_clock);
     live.finish_startup_frame(palette_clock, present_clock);
+    // Base demo 1 launches at half charge on both sides. Expansion DOS gives
+    // all six bands this RGB6 value, including while the lift palette fades.
+    for(unsigned slot{80}; slot < 86; ++slot) {
+      if(live.colours().dac_colours[slot] != std::array<uint8_t, 3>{13, 30, 12}) {
+        f.fail("Redux shield colour during the base-game lift at frame " + std::to_string(i));
+      }
+    }
     if(auto const *path{std::getenv("EARTHSIEGE_STARTUP_IMAGES")}) {
       std::filesystem::create_directories(path);
       live.image().save(std::filesystem::path{path} / ("lift-" + std::to_string(i) + ".ppm"), live.colours());

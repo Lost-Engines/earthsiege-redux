@@ -135,7 +135,7 @@ damage, objectives or random-generator results.
 |---|---|
 | Four complete supplied recordings | All 9,300 input records consumed; 7,032 captured simulation/exit states, complete gameplay and visual RNG, and camera state agree. |
 | Mission return | Final RESULTS.DAT and MISSION.VAR agree byte for byte in all four recordings. |
-| Replay cockpit pictures | 584 weapon-label samples, 579 instrument regions/colour samples, twelve complete frames and six scene regions match. |
+| Replay cockpit pictures | 584 weapon-label samples, 147 reactor and throttle regions, twelve complete frames and six scene regions match base-game DOS. Another 432 shield samples check the original band positions with the expansion colours used by Redux. |
 | Replay sound requests | All 7,073 ordered non-engine starts and sound stops agree. Engine starts/retries have the timing boundary below. |
 | Campaign/shell | Original launch files and RNG for 670 GO launches, 396 campaign transitions, four new-career constructors, eighteen short-cycle transactions and 121 further consecutive returns through six victory/defeat journeys across all three battle sets. Separate original comparisons cover grading, recovery, inventories, crew, repairs and construction. |
 | Graphics | Original model hierarchies, equipment, animation, damage, lighting, culling, scenery ordering, textures, palette effects and all 24 environments have component comparisons. Recent additions include 66 ground-projection cases, 3,000 clipped-line rasters and 94 missile-camera scenes with ground attachments. |
