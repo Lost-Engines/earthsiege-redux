@@ -2,9 +2,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <future>
+#include <exception>
 #include <limits>
 #include <stdexcept>
+#include <system_error>
 #include <thread>
 #include "render/polygon_raster.h"
 #include "simulation/fixed_math.h"
@@ -236,10 +237,36 @@ void ground_texture::draw_scaled(framebuffer &target, vec3<int32_t> const &posit
   auto const draw_rows{[&](int first) {
     for(int y{area.top + first}; y <= area.bottom; y += jobs) draw_row(y);
   }};
-  std::vector<std::future<void>> workers;
-  for(int i{1}; i < jobs; ++i) workers.push_back(std::async(std::launch::async | std::launch::deferred, draw_rows, i));
+  struct row_worker {
+    std::exception_ptr error;
+    std::jthread thread;
+  };
+  std::vector<row_worker> workers(static_cast<size_t>(jobs - 1));
+  for(int i{1}; i < jobs; ++i) {
+    auto &worker{workers[static_cast<size_t>(i - 1)]};
+    try {
+      worker.thread = std::jthread{[&draw_rows, &worker, i] {
+        try {
+          draw_rows(i);
+        } catch(...) {
+          worker.error = std::current_exception();
+        }
+      }};
+    } catch(std::system_error const &e) {
+      // The caller draws this group of rows if a thread could not start.
+      if(e.code() != std::errc::resource_unavailable_try_again) throw;
+    }
+  }
   draw_rows(0);
-  for(auto &worker : workers) worker.get();
+  for(int i{1}; i < jobs; ++i) {
+    auto &worker{workers[static_cast<size_t>(i - 1)]};
+    if(worker.thread.joinable()) {
+      worker.thread.join();
+      if(worker.error) std::rethrow_exception(worker.error);
+    } else {
+      draw_rows(i);
+    }
+  }
 }
 
 void ground_texture::draw_expansion(framebuffer &target, vec3<int32_t> const &position, vec3<uint16_t> const &angles, background_view const &view, background_bands const &bands) {
