@@ -2,13 +2,23 @@
 
 In Dynamix's 1994 mech simulator *Metaltech: Earthsiege*, you command a squad of armoured walkers called HERCs against the Cybrids, the machines that have overrun Earth. Redux adds higher resolutions, longer views and combat fixes to the [faithful reconstruction of Earthsiege](https://github.com/Lost-Engines/earthsiege-cpp).
 
-## Getting started
+## Playing the game
 
-1. Download the package for Windows, Linux or Mac (Apple Silicon) from the [latest Redux release](https://github.com/Lost-Engines/earthsiege-redux/releases/latest).
-2. Extract the whole archive. On Windows, double-click `earthsiege.exe`. On Linux or macOS, run `./earthsiege` from the extracted folder.
-3. Choose **Earthsiege** or **Earthsiege Expansion**. Both are included.
+Earthsiege and its expansion are bundled in the [Windows, Linux and Apple Silicon Mac downloads](https://github.com/Lost-Engines/earthsiege-redux/releases/latest).
 
-Sound Blaster music works out of the box. For Roland music, follow the [fetch-assets instructions](https://github.com/Lost-Engines/earthsiege-cpp#optional-roland-music).
+## Building from source
+
+Redux uses the [same build tools and platform prerequisites as Earthsiege C++](https://github.com/Lost-Engines/earthsiege-cpp#building-from-source).
+
+```sh
+git clone https://github.com/Lost-Engines/earthsiege-redux.git
+cd earthsiege-redux
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+cmake --build build --parallel
+./build/earthsiege
+```
+
+The checkout includes the game data and Sound Blaster music. For Roland music, fetch the optional ROMs with `./scripts/fetch-assets.sh` on Linux or macOS, or `.\scripts\fetch-assets.bat` from PowerShell on Windows. Press **Ctrl+Shift+M** in the game to choose a device. [Music setup](https://github.com/Lost-Engines/earthsiege-cpp#optional-roland-music)
 
 ## Bug fixes
 
