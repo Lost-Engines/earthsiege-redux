@@ -8,7 +8,6 @@ namespace earthsiege {
 class cockpit_surround {
   int first_x, width, height;
   std::array<int32_t, 2> sight;
-  std::array<int, 2> window_sill;
   std::vector<int16_t> artwork;
   framebuffer front, lower;
 public:

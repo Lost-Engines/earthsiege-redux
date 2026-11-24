@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include "render/cockpit_surround.h"
 #include "resources/name_table.h"
@@ -6,9 +7,38 @@
 using namespace earthsiege;
 namespace {
 
+void check_outer_edges(cockpit_surround const &art, cockpit_artwork const &cockpit, std::string const &name) {
+  // Both windows show the same 320x200 panel at one output pixel per artwork pixel.
+  framebuffer ultrawide{{1280, 200}}, high_fov{{1280, 800}};
+  for(auto const &window : cockpit.windows) {
+    auto const origin{window.instrument_origin};
+    cockpit_framing framing{.pan = origin[0], .down = origin[1], .lower = cockpit.windows[1].instrument_origin[1],
+                            .sight_y = cockpit.windows[0].projection_centre()[1]};
+    ultrawide.clear(17);
+    high_fov.clear(17);
+    art.draw(ultrawide, ultrawide.size().cockpit_panel(framing), origin);
+    framing.scale = cockpit_fov_zoom(136.4);
+    auto const panel{high_fov.size().cockpit_panel(framing)};
+    art.draw(high_fov, panel, origin);
+    auto const &pixels{high_fov.pixels()};
+    int const stride{high_fov.size().width};
+    if(!std::equal(ultrawide.pixels().begin(), ultrawide.pixels().end(), pixels.begin() + panel.top * stride))
+      throw std::runtime_error{"high-FOV side panels differ from the ultrawide cockpit on " + name};
+
+    int const left{panel.left + cockpit.windows[3].instrument_origin[0] - origin[0]};
+    int const right{panel.right + cockpit.windows[2].instrument_origin[0] - origin[0]};
+    for(int y{0}; y < panel.top - origin[1]; ++y) {
+      auto const row{pixels.begin() + y * stride};
+      if(row[0] != row[left] || row[stride - 1] != row[right])
+        throw std::runtime_error{"overhead canopy ends at the outer side panel on " + name};
+    }
+  }
+}
+
 void check_art(resource_store const &resources, std::string const &name) {
   auto const cockpit{read_cockpit(resources, name)};
   cockpit_surround art{cockpit};
+  check_outer_edges(art, cockpit, name);
   framebuffer world{{640, 200}, 17};
   art.draw(world, world.size().cockpit_panel(), {0,0});
   for(bool right : {false, true}) {

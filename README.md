@@ -33,7 +33,7 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 ## Game improvements
 
 - The 3D world and briefing map render at your window's resolution. The cockpit and menus keep their original pixel art.
-- Widescreen cockpits use the HERC's original side panels. Above the default field of view, the cockpit and scenery zoom out together around the gunsight, revealing more of the side windows and lower console. Smaller angles zoom the view through the glass.
+- Widescreen cockpits use the HERC's original side panels. Above the default field of view, the cockpit and scenery zoom out together around the gunsight, revealing more of the side windows and lower console. If either view reaches past the original artwork, the window frames and hull extend to the edges of the screen. Smaller angles zoom the view through the glass.
 - Models stay detailed and visible ten times farther away by default. You can adjust detail and draw distance independently.
 - Fog fades textures, dark gun barrels and muzzle flashes on distant models. HERC shadows fade with the machines that cast them.
 - Hits can throw more debris. You can change how many pieces fly off and how many can be in the air at once.
