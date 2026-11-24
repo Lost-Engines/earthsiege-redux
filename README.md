@@ -4,8 +4,8 @@ In Dynamix's 1994 mech simulator *Metaltech: Earthsiege*, you command a squad of
 
 ## Getting started
 
-1. Choose your Windows, Linux or Mac (Apple Silicon) package from [Redux releases](https://github.com/Lost-Engines/earthsiege-redux/releases). If the first release is still pending, sign in to GitHub, open a successful [Redux build](https://github.com/Lost-Engines/earthsiege-redux/actions/workflows/build.yml) and download the file ending in `-Release` for your system under **Artifacts**.
-2. Extract the whole archive (and the archive inside if you used an Actions download). Double-click `earthsiege.exe` on Windows, or run `./earthsiege` from that folder on Linux or macOS.
+1. Download the package for Windows, Linux or Mac (Apple Silicon) from the [latest Redux release](https://github.com/Lost-Engines/earthsiege-redux/releases/latest).
+2. Extract the whole archive. On Windows, double-click `earthsiege.exe`. On Linux or macOS, run `./earthsiege` from the extracted folder.
 3. Choose **Earthsiege** or **Earthsiege Expansion**. Both are included.
 
 Sound Blaster music works out of the box. For Roland music, follow the [fetch-assets instructions](https://github.com/Lost-Engines/earthsiege-cpp#optional-roland-music).
