@@ -110,9 +110,35 @@ void check_composite(earthsiege::window &display, earthsiege::render_size region
   check();
 }
 
+void toggle_with_alt_enter(earthsiege::window &display, int enter) {
+  auto *const host{display.get()};
+  auto const key{glfwSetKeyCallback(host, nullptr)};
+  glfwSetKeyCallback(host, key);
+  bool const was_fullscreen{glfwGetWindowMonitor(host) != nullptr};
+  key(host, enter, 0, GLFW_PRESS, GLFW_MOD_ALT);
+  display.pump_events();
+  auto *const monitor{glfwGetWindowMonitor(host)};
+  require((monitor != nullptr) != was_fullscreen, "Alt+Enter switches window mode");
+  key(host, enter, 0, GLFW_REPEAT, GLFW_MOD_ALT);
+  key(host, enter, 0, GLFW_REPEAT, 0);
+  key(host, enter, 0, GLFW_RELEASE, 0);
+  display.pump_events();
+  require(glfwGetWindowMonitor(host) == monitor, "holding Alt+Enter switches only once");
+  earthsiege::window_event event;
+  while(display.poll(event)) {
+    require(event.type != earthsiege::event_type::key_down && event.type != earthsiege::event_type::key_up,
+            "fullscreen shortcut stays out of game input");
+  }
+  key(host, enter, 0, GLFW_PRESS, 0);
+  key(host, enter, 0, GLFW_RELEASE, 0);
+  require(display.poll(event) && event.type == earthsiege::event_type::key_down && event.key == enter, "plain Enter press after shortcut");
+  require(display.poll(event) && event.type == earthsiege::event_type::key_up && event.key == enter, "plain Enter release after shortcut");
+}
+
 void check_window() {
   earthsiege::window display{2};
   auto *handle{display.get()};
+  require(!glfwGetWindowMonitor(handle), "default startup is windowed");
   earthsiege::window_event event;
   while(display.poll(event)) {}
   // Dispatch through the registered GLFW callbacks, then consume the game queue.
@@ -179,6 +205,23 @@ void check_window() {
   glReadPixels(art.left + 101, h - 1 - art.top - 100, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel.data());
   require(pixel == std::array<uint8_t, 3>{0x12, 0x34, 0x56}, "adjacent output pixel remains independent");
   check_composite(display, size);
+  bool const positioned{glfwGetPlatform() != GLFW_PLATFORM_WAYLAND};
+  int x{}, y{};
+  if(positioned) {
+    glfwSetWindowPos(handle, 43, 57);
+    glfwGetWindowPos(handle, &x, &y);
+  }
+  toggle_with_alt_enter(display, GLFW_KEY_ENTER);
+  glfwGetFramebufferSize(handle, &w, &h);
+  require(display.resolution() == earthsiege::render_size{w, h}, "fullscreen uses the live framebuffer");
+  toggle_with_alt_enter(display, GLFW_KEY_KP_ENTER);
+  glfwGetWindowSize(handle, &w, &h);
+  require(w == 803 && h == 501, "fullscreen restores resized window");
+  if(positioned) {
+    int left{}, top{};
+    glfwGetWindowPos(handle, &left, &top);
+    require(left == x && top == y, "fullscreen restores window position");
+  }
   glfwSetWindowShouldClose(handle, GLFW_TRUE);
   while(display.poll(event) && event.type != earthsiege::event_type::close) {}
   require(event.type == earthsiege::event_type::close, "close survives nested dialog consumption");
@@ -190,7 +233,14 @@ int main(int argc, char **argv) try {
   earthsiege::resource_store resources{argv[1]};
   earthsiege::software_cursor arrow{resources.read("shell0", "RES32/ARROW.DCI")};
   check_window();
-  earthsiege::window fixed{2, earthsiege::render_size{731, 413}};
+  earthsiege::window fixed{2, earthsiege::render_size{731, 413}, true};
+  require(glfwGetWindowMonitor(fixed.get()), "fullscreen at startup");
+  require(fixed.resolution() == earthsiege::render_size{731, 413}, "fixed render resolution in fullscreen");
+  toggle_with_alt_enter(fixed, GLFW_KEY_ENTER);
+  int w{}, h{};
+  glfwGetWindowSize(fixed.get(), &w, &h);
+  require(w == 640 && h == 400, "leaving startup fullscreen uses the selected window scale");
+  require(fixed.resolution() == earthsiege::render_size{731, 413}, "fixed render resolution after leaving fullscreen");
   check_composite(fixed, {417, 277}, &arrow);
   std::cout << "GLFW events and OpenGL framebuffer checks pass\n";
 } catch(std::exception const &error) {

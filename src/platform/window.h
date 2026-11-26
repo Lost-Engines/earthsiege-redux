@@ -51,12 +51,17 @@ class window {
   cockpit_framing framing;
   std::optional<render_size> fixed_resolution;
   mutable render_size last_drawable{};
+  rectangle windowed_bounds{};
+  bool windowed_maximized{false};
+  bool fullscreen_toggle_pending{false};
+  std::array<bool, 2> fullscreen_keys{};
   std::deque<window_event> events;
   static auto self(GLFWwindow *handle)->window &;
   auto logical_position(double x, double y) const->std::array<int, 2>;
+  void toggle_fullscreen();
 
 public:
-  explicit window(unsigned int scale = 0, std::optional<render_size> resolution = {});
+  explicit window(unsigned int scale = 0, std::optional<render_size> resolution = {}, bool fullscreen = false);
   ~window();
   window(window const &) = delete;
   auto operator=(window const &)->window & = delete;

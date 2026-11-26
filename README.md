@@ -47,6 +47,7 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 | Option | What it does |
 | --- | --- |
 | `--resolution WxH` | Set a fixed render size, such as `1920x1080`. Use `window` (the default) to follow the window size. |
+| `--fullscreen` | Start fullscreen at the desktop resolution. Press Alt+Enter to switch between fullscreen and windowed play. |
 | `--fov DEGREES` | Horizontal field of view at 16:10, from 10° to 170° (default 64.01°). Try `--fov 90` to see more of the cockpit. Wider windows extend the view on both sides. |
 | `--scale N` | Set the initial window size to a multiple of 320×200. |
 | `--lod-distance-multiplier N` | Set how far away models switch to simpler shapes. Default 10. Use 1 for the DOS distances. |

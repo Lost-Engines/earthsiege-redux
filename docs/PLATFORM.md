@@ -7,6 +7,9 @@ TFX. SDL is no longer a dependency.
 Redux uses the GLFW framebuffer dimensions as its render resolution. A fixed
 `--resolution WIDTHxHEIGHT` sets the render target independently of the window.
 `--scale N` sets the initial window size in multiples of 320×200.
+`--fullscreen` starts the game at the desktop video mode. Alt+Enter toggles it
+in menus, missions and demos. Returning to windowed play restores the previous
+window size. A fixed render resolution applies in either mode.
 
 The software renderer projects world geometry into the pixels available inside
 the original 8:5 picture. The ground sampler uses the selected resolution and

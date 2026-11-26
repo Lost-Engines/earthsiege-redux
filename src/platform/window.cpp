@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <utility>
 #include "indexed_display.h"
 #include "render/software_cursor.h"
 #include "resources/artwork.h"
@@ -23,9 +24,10 @@ auto window::self(GLFWwindow *handle)->window & {
   return *static_cast<window *>(glfwGetWindowUserPointer(handle));
 }
 
-window::window(unsigned int scale, std::optional<render_size> resolution) : fixed_resolution{resolution} {
+window::window(unsigned int scale, std::optional<render_size> resolution, bool fullscreen) : fixed_resolution{resolution} {
   bool const automatic{scale == 0 && !resolution};
-  bool const compositor{automatic && glfwGetPlatform() == GLFW_PLATFORM_WAYLAND};
+  bool const wayland{glfwGetPlatform() == GLFW_PLATFORM_WAYLAND};
+  bool const compositor{automatic && wayland};
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
   glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
@@ -53,6 +55,7 @@ window::window(unsigned int scale, std::optional<render_size> resolution) : fixe
                        y + top + (height - top - bottom - 200 * fit) / 2);
     }
   }
+  if(fullscreen && !wayland) toggle_fullscreen();
   glfwShowWindow(handle.get());
   if(compositor) {
     int width{0};
@@ -64,6 +67,8 @@ window::window(unsigned int scale, std::optional<render_size> resolution) : fixe
     int const fit{std::max(1, std::min(width / 320, height / 200))};
     glfwSetWindowSize(handle.get(), 320 * fit, 200 * fit);
   }
+  // Wayland assigns the window its shell role and initial size when shown.
+  if(fullscreen && wayland) toggle_fullscreen();
   glfwMakeContextCurrent(handle.get());
   glfwSwapInterval(1);
   presenter = std::make_unique<indexed_display>();
@@ -80,7 +85,19 @@ window::window(unsigned int scale, std::optional<render_size> resolution) : fixe
     glfwSetInputMode(w, GLFW_CURSOR, active ? GLFW_CURSOR_HIDDEN : GLFW_CURSOR_NORMAL);
   });
   glfwSetKeyCallback(handle.get(), [](GLFWwindow *w, int key, int, int action, int mods){
-    self(w).events.push_back({
+    auto &owner{self(w)};
+    if(key == GLFW_KEY_ENTER || key == GLFW_KEY_KP_ENTER) {
+      auto &consumed{owner.fullscreen_keys[key == GLFW_KEY_ENTER ? 0u : 1u]};
+      if(action == GLFW_PRESS) {
+        consumed = (mods & GLFW_MOD_ALT) != 0;
+        if(consumed) owner.fullscreen_toggle_pending = !owner.fullscreen_toggle_pending;
+      }
+      if(consumed) {
+        if(action == GLFW_RELEASE) consumed = false;
+        return;
+      }
+    }
+    owner.events.push_back({
       .type = action == GLFW_RELEASE ? event_type::key_up : event_type::key_down,
       .key = key,
       .modifiers = mods,
@@ -200,8 +217,49 @@ void window::warp_mouse(int x, int y) {
   auto const p{viewport::fit(bw, bh, resolution(), false, framing).cursor(x, y, width, height, bw, bh)};
   glfwSetCursorPos(handle.get(), p[0], p[1]);
 }
+void window::toggle_fullscreen() {
+  auto *const host{handle.get()};
+  if(glfwGetWindowMonitor(host)) {
+    glfwSetWindowMonitor(host, nullptr, windowed_bounds.left, windowed_bounds.top,
+                         windowed_bounds.width(), windowed_bounds.height(), GLFW_DONT_CARE);
+    if(windowed_maximized) glfwMaximizeWindow(host);
+    return;
+  }
+
+  int x{}, y{}, width{}, height{};
+  bool const positioned{glfwGetPlatform() != GLFW_PLATFORM_WAYLAND};
+  if(positioned) glfwGetWindowPos(host, &x, &y);
+  glfwGetWindowSize(host, &width, &height);
+  windowed_bounds = {x, y, x + width - 1, y + height - 1};
+  windowed_maximized = glfwGetWindowAttrib(host, GLFW_MAXIMIZED) == GLFW_TRUE;
+
+  auto *monitor{glfwGetPrimaryMonitor()};
+  if(positioned) {
+    int count{};
+    auto **monitors{glfwGetMonitors(&count)};
+    int64_t largest_area{};
+    for(int i{0}; i < count; ++i) {
+      auto const *mode{glfwGetVideoMode(monitors[i])};
+      if(!mode) continue;
+      int left{}, top{};
+      glfwGetMonitorPos(monitors[i], &left, &top);
+      auto const overlap{windowed_bounds.intersect({left, top, left + mode->width - 1, top + mode->height - 1})};
+      auto const area{int64_t{std::max(0, overlap.width())} * std::max(0, overlap.height())};
+      if(area > largest_area) {
+        monitor = monitors[i];
+        largest_area = area;
+      }
+    }
+  }
+  if(monitor) {
+    if(auto const *mode{glfwGetVideoMode(monitor)}) {
+      glfwSetWindowMonitor(host, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    }
+  }
+}
 void window::pump_events() {
   glfwPollEvents();
+  if(std::exchange(fullscreen_toggle_pending, false)) toggle_fullscreen();
 }
 auto window::poll(window_event &event)->bool {
   if(events.empty()) pump_events();

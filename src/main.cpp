@@ -90,6 +90,7 @@ auto main(int argc, char *argv[])->int try {
   std::optional<std::filesystem::path> requested_roms;
   std::optional<std::filesystem::path> requested_soundfont;
   unsigned int scale{0};
+  bool fullscreen{false};
   std::optional<earthsiege::render_size> fixed_resolution;
   earthsiege::view_distances distances;
   earthsiege::fragment_settings fragments;
@@ -117,6 +118,7 @@ auto main(int argc, char *argv[])->int try {
         "  --soundfont PATH      SoundFont for the General MIDI music option\n"
         "  --audio-setup         Open the saved music-device selector\n"
         "  --resolution WxH      Set a fixed render size (default: window framebuffer)\n"
+        "  --fullscreen          Start fullscreen (Alt+Enter toggles during play)\n"
         "  --fov DEGREES         Horizontal field of view at 16:10 (10-170, default 64.01)\n"
         "                        Wider angles pull back the cockpit and instruments\n"
         "  --lod-distance-multiplier N  Scale model LOD switch distances (default: 10, higher keeps detail farther away)\n"
@@ -163,6 +165,8 @@ auto main(int argc, char *argv[])->int try {
       requested_soundfont = argv[++index];
     } else if(argument.starts_with("--soundfont=")) {
       requested_soundfont = argument.substr(12);
+    } else if(argument == "--fullscreen") {
+      fullscreen = true;
     } else if(argument == "--resolution" && index + 1 < argc) {
       fixed_resolution = resolution_option(argv[++index]);
     } else if(argument.starts_with("--resolution=")) {
@@ -203,9 +207,9 @@ auto main(int argc, char *argv[])->int try {
   }
 #ifndef NDEBUG
   std::unique_ptr<earthsiege::window> display;
-  if(!headless && !list) display = std::make_unique<earthsiege::window>(scale, fixed_resolution);
+  if(!headless && !list) display = std::make_unique<earthsiege::window>(scale, fixed_resolution, fullscreen);
 #else
-  earthsiege::window game_window{scale, fixed_resolution};
+  earthsiege::window game_window{scale, fixed_resolution, fullscreen};
   auto *const display{&game_window};
 #endif
   auto const render_resolution{[&]{ return display ? display->resolution() : fixed_resolution.value_or(earthsiege::render_size{}); }};
