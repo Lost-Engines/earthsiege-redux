@@ -8,7 +8,7 @@ Earthsiege and its expansion are bundled in the [Windows, Linux and Apple Silico
 
 ## Building from source
 
-Redux uses the [same build tools and platform prerequisites as Earthsiege C++](https://github.com/Lost-Engines/earthsiege-cpp#building-from-source).
+Redux uses the [same build tools and platform prerequisites as Earthsiege C++](https://github.com/Lost-Engines/earthsiege-cpp#building-from-source). CMake looks for Boost.Program_options and builds it from source if needed.
 
 ```sh
 git clone https://github.com/Lost-Engines/earthsiege-redux.git
@@ -43,6 +43,8 @@ The checkout includes the game data and Sound Blaster music. For Roland music, f
 - A new random generator varies encounters and combat in live missions. The eight recorded demos use the original rolls.
 
 ## Command-line options
+
+Options with values accept either spelling, for example `--music opl3` or `--music=opl3`. If you repeat an option, the last value wins.
 
 | Option | What it does |
 | --- | --- |
